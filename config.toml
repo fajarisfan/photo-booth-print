@@ -1,0 +1,15 @@
+[theme]
+# Warna teks utama (Parchment color dari spek QuestUI)
+textColor = "#F5E6D3"
+
+# Warna background utama halaman (Deep dark brown)
+backgroundColor = "#1A0F0A"
+
+# Warna background card / sidebar (Surface Default)
+secondaryBackgroundColor = "#2C1A10"
+
+# Warna emas buat tombol, slider, dan aksen aktif (Primary Gold)
+primaryColor = "#CA8A04"
+
+# Paksa font bawaan pake tipe Serif biar dapet feel medieval/RPG
+font = "serif"
