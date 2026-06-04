@@ -1343,7 +1343,7 @@ Filter: Normal · Hitam Putih · Vintage · Cool Blue · Golden Hour · Faded ·
 </div>
 """, unsafe_allow_html=True)
 # ── Tampilkan screenshot chat HRD ─────────────────────────────────────────────
-st.image("Screenshot_20260604-135129.jpg", caption="⚔️ Active Quest: Career Path Transition", use_container_width=True)
+st.image("https://i.postimg.cc/2Sc9t3vH/Screenshot-20260604-150953.png", caption="⚔️ Active Quest: Career Path Transition", use_container_width=True)
 
 # ── Surat untuk Zizah ─────────────────────────────────────────────────────────
 pesan_zizah_html = """
