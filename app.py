@@ -865,13 +865,23 @@ if "selected_tpl" not in st.session_state:
     st.session_state.selected_tpl = "pas_foto_2x3"
 if "selected_filter" not in st.session_state:
     st.session_state.selected_filter = "normal"
+if "collage_photos" not in st.session_state:
+    st.session_state.collage_photos = []
+if "collage_layout" not in st.session_state:
+    st.session_state.collage_layout = "grid"
+if "collage_filter" not in st.session_state:
+    st.session_state.collage_filter = "normal"
 
 # ── UI ─────────────────────────────────────────────────────────────────────────
 st.markdown("# 📸 Photo Booth Cetak")
-st.markdown("*Ambil foto → Pilih tema → Pilih template → Download PDF / JPG*")
 st.divider()
 
-col_left, col_right = st.columns([1, 1.4], gap="large")
+tab_photobooth, tab_collage = st.tabs(["📸 Photo Booth", "🖼️ Collage"])
+
+with tab_photobooth:
+ st.markdown("*Ambil foto → Pilih tema → Pilih template → Download PDF / JPG*")
+
+ col_left, col_right = st.columns([1, 1.4], gap="large")
 
 # ── LEFT: Foto input + Filter + Template picker ───────────────────────────────
 with col_left:
@@ -1080,6 +1090,248 @@ with col_right:
                 mime="application/zip",
                 use_container_width=True,
             )
+
+
+with tab_collage:
+    st.markdown("*Upload beberapa foto → Pilih layout → Atur tema → Download*")
+
+    # ── Collage helpers ───────────────────────────────────────────────────────
+    COLLAGE_LAYOUTS = {
+        "grid":    {"name": "Grid",          "icon": "⊞",  "desc": "Kotak-kotak sama besar"},
+        "magazine":{"name": "Layout Majalah","icon": "📰", "desc": "1 foto besar + beberapa kecil"},
+        "strip":   {"name": "Strip",         "icon": "🎞️", "desc": "Foto berjajar horizontal"},
+        "mosaic":  {"name": "Mosaic",        "icon": "🔲", "desc": "Variasi ukuran acak"},
+    }
+
+    def build_collage_grid(photos, fkeys, canvas_w=2480, canvas_h=3508):
+        """Grid: equal-size cells, auto cols/rows."""
+        n = len(photos)
+        if n == 0: return None
+        cols = math.ceil(math.sqrt(n))
+        rows = math.ceil(n / cols)
+        pad = 30
+        cell_w = (canvas_w - pad*(cols+1)) // cols
+        cell_h = (canvas_h - pad*(rows+1)) // rows
+        sheet = Image.new("RGB", (canvas_w, canvas_h), (255,255,255))
+        for i, (ph, fk) in enumerate(zip(photos, fkeys)):
+            r, c = divmod(i, cols)
+            x = pad + c*(cell_w+pad)
+            y = pad + r*(cell_h+pad)
+            cell = fit_crop(apply_filter(ph, fk), cell_w, cell_h)
+            sheet.paste(cell, (x, y))
+        return sheet
+
+    def build_collage_magazine(photos, fkeys, canvas_w=2480, canvas_h=3508):
+        """Magazine: first photo big top, rest small bottom row."""
+        n = len(photos)
+        if n == 0: return None
+        pad = 30
+        sheet = Image.new("RGB", (canvas_w, canvas_h), (240,240,240))
+        if n == 1:
+            big_h = canvas_h - pad*2
+            cell = fit_crop(apply_filter(photos[0], fkeys[0]), canvas_w-pad*2, big_h)
+            sheet.paste(cell, (pad, pad))
+        else:
+            big_h = int((canvas_h - pad*3) * 0.62)
+            small_h = canvas_h - big_h - pad*3
+            # big photo
+            big = fit_crop(apply_filter(photos[0], fkeys[0]), canvas_w-pad*2, big_h)
+            sheet.paste(big, (pad, pad))
+            # small row
+            small_n = n - 1
+            small_w = (canvas_w - pad*(small_n+1)) // small_n
+            for i, (ph, fk) in enumerate(zip(photos[1:], fkeys[1:])):
+                x = pad + i*(small_w+pad)
+                y = big_h + pad*2
+                cell = fit_crop(apply_filter(ph, fk), small_w, small_h)
+                sheet.paste(cell, (x, y))
+        return sheet
+
+    def build_collage_strip(photos, fkeys, canvas_w=3508, canvas_h=2480):
+        """Horizontal strip — landscape."""
+        n = len(photos)
+        if n == 0: return None
+        pad = 30
+        cell_w = (canvas_w - pad*(n+1)) // n
+        cell_h = canvas_h - pad*2
+        sheet = Image.new("RGB", (canvas_w, canvas_h), (20,20,20))
+        for i, (ph, fk) in enumerate(zip(photos, fkeys)):
+            x = pad + i*(cell_w+pad)
+            cell = fit_crop(apply_filter(ph, fk), cell_w, cell_h)
+            sheet.paste(cell, (x, pad))
+        return sheet
+
+    def build_collage_mosaic(photos, fkeys, canvas_w=2480, canvas_h=3508):
+        """Mosaic: varied sizes based on index pattern."""
+        n = len(photos)
+        if n == 0: return None
+        pad = 20
+        sheet = Image.new("RGB", (canvas_w, canvas_h), (255,255,255))
+
+        # Predefined mosaic slot ratios (x%, y%, w%, h%) for up to 6 photos
+        SLOTS = [
+            [(0,0,1,1)],                                           # 1 photo
+            [(0,0,.5,1),(.5,0,.5,1)],                             # 2
+            [(0,0,.6,1),(.6,0,.4,.5),(.6,.5,.4,.5)],             # 3
+            [(0,0,.5,.6),(.5,0,.5,.6),(0,.6,.5,.4),(.5,.6,.5,.4)], # 4
+            [(0,0,.6,.55),(.6,0,.4,.55),(0,.55,.33,.45),(.33,.55,.34,.45),(.67,.55,.33,.45)], # 5
+            [(0,0,.5,.5),(.5,0,.5,.5),(0,.5,.33,.5),(.33,.5,.34,.5),(.67,.5,.33,.5),(.0,.5,.33,.5)], # 6
+        ]
+        slots = SLOTS[min(n,6)-1]
+        uw = canvas_w - pad
+        uh = canvas_h - pad
+
+        for i, (ph, fk) in enumerate(zip(photos[:6], fkeys[:6])):
+            if i >= len(slots): break
+            sx, sy, sw, sh = slots[i]
+            x = int(pad/2 + sx*uw)
+            y = int(pad/2 + sy*uh)
+            w = max(1, int(sw*uw - pad))
+            h = max(1, int(sh*uh - pad))
+            cell = fit_crop(apply_filter(ph, fk), w, h)
+            sheet.paste(cell, (x, y))
+        return sheet
+
+    def build_collage(photos, fkeys, layout):
+        if layout == "grid":     return build_collage_grid(photos, fkeys)
+        if layout == "magazine": return build_collage_magazine(photos, fkeys)
+        if layout == "strip":    return build_collage_strip(photos, fkeys)
+        if layout == "mosaic":   return build_collage_mosaic(photos, fkeys)
+        return None
+
+    # ── Collage UI ────────────────────────────────────────────────────────────
+    cc_left, cc_right = st.columns([1, 1.4], gap="large")
+
+    with cc_left:
+        st.markdown("### 1. Upload Foto (maks 6)")
+        uploaded_collage = st.file_uploader(
+            "Upload foto untuk collage",
+            type=["jpg","jpeg","png","webp"],
+            accept_multiple_files=True,
+            key="collage_uploader",
+            label_visibility="visible",
+        )
+        if uploaded_collage:
+            new_photos = [Image.open(f).convert("RGB") for f in uploaded_collage[:6]]
+            st.session_state.collage_photos = new_photos
+            st.success(f"✅ {len(new_photos)} foto diupload!")
+
+        if st.session_state.collage_photos:
+            st.markdown(f"**{len(st.session_state.collage_photos)} foto aktif**")
+            thumb_cols = st.columns(min(len(st.session_state.collage_photos), 3))
+            for i, ph in enumerate(st.session_state.collage_photos):
+                with thumb_cols[i % 3]:
+                    t = ph.copy()
+                    t.thumbnail((120, 120))
+                    st.image(t, use_container_width=True, caption=f"Foto {i+1}")
+
+            if st.button("🗑️ Hapus Semua Foto", key="clear_collage"):
+                st.session_state.collage_photos = []
+                st.rerun()
+
+        st.divider()
+        st.markdown("### 2. Pilih Layout")
+        for lk, lv in COLLAGE_LAYOUTS.items():
+            is_sel = st.session_state.collage_layout == lk
+            if st.button(
+                f"{lv['icon']} {lv['name']} — {lv['desc']}",
+                key=f"clayout_{lk}",
+                use_container_width=True,
+                type="primary" if is_sel else "secondary",
+            ):
+                st.session_state.collage_layout = lk
+                st.rerun()
+
+        st.divider()
+        st.markdown("### 3. Tema per Foto")
+        st.caption("Setiap foto bisa punya filter berbeda, atau pakai satu filter untuk semua.")
+
+        # Global filter
+        global_fk = st.selectbox(
+            "Filter semua foto sekaligus",
+            options=list(FILTERS.keys()),
+            format_func=lambda k: f"{FILTERS[k]['icon']} {FILTERS[k]['name']}",
+            key="collage_global_filter",
+        )
+        apply_all = st.button("✅ Terapkan ke Semua", key="apply_all_filter")
+
+        n_photos = len(st.session_state.collage_photos)
+        if "collage_fkeys" not in st.session_state or len(st.session_state.collage_fkeys) != n_photos:
+            st.session_state.collage_fkeys = ["normal"] * n_photos
+        if apply_all:
+            st.session_state.collage_fkeys = [global_fk] * n_photos
+            st.rerun()
+
+        if n_photos > 0:
+            st.markdown("**Filter individual:**")
+            for i in range(n_photos):
+                fk = st.selectbox(
+                    f"Foto {i+1}",
+                    options=list(FILTERS.keys()),
+                    index=list(FILTERS.keys()).index(st.session_state.collage_fkeys[i]),
+                    format_func=lambda k: f"{FILTERS[k]['icon']} {FILTERS[k]['name']}",
+                    key=f"cfk_{i}",
+                )
+                st.session_state.collage_fkeys[i] = fk
+
+    with cc_right:
+        st.markdown("### 4. Preview & Download")
+
+        if not st.session_state.collage_photos:
+            st.markdown("""
+            <div style="background:#1a1a1a; border:2px dashed #444; border-radius:12px;
+                        height:340px; display:flex; align-items:center; justify-content:center;
+                        color:#666; font-size:16px; text-align:center; padding:20px;">
+                🖼️<br><br>Belum ada foto.<br>Upload minimal 1 foto dulu di panel kiri.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            layout_info = COLLAGE_LAYOUTS[st.session_state.collage_layout]
+            st.markdown(f"""
+            <div class="info-box">
+            <b>{layout_info['icon']} {layout_info['name']}</b> &nbsp;|&nbsp;
+            {len(st.session_state.collage_photos)} foto &nbsp;|&nbsp;
+            Resolusi: <b>300 DPI</b>
+            </div>
+            """, unsafe_allow_html=True)
+
+            fkeys = st.session_state.get("collage_fkeys", ["normal"]*len(st.session_state.collage_photos))
+
+            with st.spinner("⚙️ Membuat collage..."):
+                collage_sheet = build_collage(
+                    st.session_state.collage_photos,
+                    fkeys,
+                    st.session_state.collage_layout,
+                )
+
+            if collage_sheet:
+                thumb_c = preview_thumbnail(collage_sheet, max_px=700)
+                st.markdown('<div class="preview-label">PREVIEW COLLAGE</div>', unsafe_allow_html=True)
+                st.image(thumb_c, use_container_width=True,
+                         caption=f"{layout_info['name']} — {len(st.session_state.collage_photos)} foto")
+
+                st.divider()
+                st.markdown("### 5. Download")
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    cjpg = sheet_to_bytes(collage_sheet, "JPEG")
+                    st.download_button(
+                        label="⬇️ Download JPG",
+                        data=cjpg,
+                        file_name=f"collage_{st.session_state.collage_layout}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
+                        mime="image/jpeg",
+                        use_container_width=True,
+                    )
+                with dc2:
+                    cpdf = sheet_to_pdf(collage_sheet, {"name": f"Collage {layout_info['name']}", "w":21,"h":29.7,"cols":1,"rows":1})
+                    st.download_button(
+                        label="⬇️ Download PDF",
+                        data=cpdf,
+                        file_name=f"collage_{st.session_state.collage_layout}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.divider()
