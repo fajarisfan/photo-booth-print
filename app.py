@@ -474,17 +474,389 @@ def preview_thumbnail(sheet: Image.Image, max_px=600) -> Image.Image:
     ratio = min(max_px / w, max_px / h)
     return sheet.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
 
-def make_filter_thumb(photo: Image.Image, filter_key: str, size: int = 120) -> Image.Image:
-    """Generate a small square thumbnail with the given filter applied."""
+def make_filter_thumb(photo: Image.Image, filter_key: str, size: int = 300) -> Image.Image:
+    """Generate a square thumbnail with the given filter applied.
+    Filter is applied BEFORE downscaling to preserve quality."""
     w, h = photo.size
-    # Center crop to square
+    # Center crop to square at original resolution
     side = min(w, h)
     x = (w - side) // 2
     y = (h - side) // 2
-    thumb = photo.crop((x, y, x + side, y + side))
-    thumb = thumb.resize((size, size), Image.LANCZOS)
-    filtered = apply_filter(thumb, filter_key)
-    return filtered
+    cropped = photo.crop((x, y, x + side, y + side))
+    # Apply filter at full crop resolution first
+    filtered = apply_filter(cropped, filter_key)
+    # Then downscale cleanly
+    return filtered.resize((size, size), Image.LANCZOS)
+
+
+# ── AR Camera Component ────────────────────────────────────────────────────────
+import streamlit.components.v1 as components
+import base64
+
+def get_ar_camera_html():
+    return """<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#111; font-family:'Courier New',monospace; color:#eee; }
+#wrap { position:relative; width:100%; max-width:480px; margin:0 auto; }
+#video {
+  width:100%; display:block; border-radius:10px;
+  transform:scaleX(-1); /* mirror preview like a normal selfie camera */
+}
+#overlay {
+  position:absolute; top:0; left:0; width:100%; height:100%;
+  border-radius:10px; pointer-events:none;
+}
+#controls {
+  display:flex; gap:6px; margin-top:8px; justify-content:center;
+  flex-wrap:wrap; align-items:center;
+}
+#captureBtn {
+  background:#f5c518; color:#000; border:none; border-radius:50%;
+  width:58px; height:58px; font-size:22px; cursor:pointer; font-weight:bold;
+  box-shadow:0 0 0 4px #333; transition:transform 0.1s, box-shadow 0.1s;
+  flex-shrink:0;
+}
+#captureBtn:active { transform:scale(0.9); box-shadow:0 0 0 2px #333; }
+.tbtn {
+  background:#1e1e1e; color:#888; border:1.5px solid #444;
+  border-radius:8px; padding:5px 9px; font-size:11px; cursor:pointer;
+  transition:all 0.15s; white-space:nowrap;
+}
+.tbtn.on { background:#1e1e0a; color:#f5c518; border-color:#f5c518; }
+#status {
+  text-align:center; color:#888; font-size:11px; margin-top:6px;
+  min-height:16px; letter-spacing:0.5px;
+}
+#flash {
+  position:absolute; top:0; left:0; width:100%; height:100%;
+  background:white; border-radius:10px; opacity:0; pointer-events:none;
+  transition:opacity 0.05s;
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="overlay"></canvas>
+  <div id="flash"></div>
+</div>
+<div id="controls">
+  <button class="tbtn" id="btnSkull"   onclick="tog('skull')">💀 Skull</button>
+  <button class="tbtn on" id="btnSticker" onclick="tog('sticker')">🎩 Sticker</button>
+  <button id="captureBtn" title="Ambil Foto">📸</button>
+  <button class="tbtn on" id="btnQuote"   onclick="tog('quote')">💬 Quote</button>
+  <button class="tbtn" id="btnHand"    onclick="tog('hand')">✋ Tangan</button>
+</div>
+<div id="status">Memuat model AI...</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
+
+<script>
+const video   = document.getElementById('video');
+const canvas  = document.getElementById('overlay');
+const ctx     = canvas.getContext('2d');
+const status  = document.getElementById('status');
+const flash   = document.getElementById('flash');
+const captBtn = document.getElementById('captureBtn');
+
+const feat = { skull:false, sticker:true, quote:true, hand:false };
+
+function tog(f) {
+  feat[f] = !feat[f];
+  document.getElementById('btn' + f.charAt(0).toUpperCase() + f.slice(1))
+    .classList.toggle('on', feat[f]);
+}
+
+// ── Quotes ───────────────────────────────────────────────────────────────────
+const QUOTES = [
+  "Senyum itu gratis ✨","You look amazing 🌟","Cheese! 🧀",
+  "Strike a pose 💃","Camera loves you 📸","Living my best life 🔥",
+  "Main character ⭐","Glow up era 🌸","Too glam 💅",
+  "Unbothered 😌","Vibe check: ✔️","Built different 💪",
+  "Soft life 🕊️","No bad days 🌈","Iconic 🏆",
+];
+let quote = QUOTES[0], qTimer = 0;
+
+// ── Landmarks state ───────────────────────────────────────────────────────────
+let faceLM = null, handLMs = [];
+
+// Key indices
+const NOSE=1, FORE=10, CHIN=152, LCHK=234, RCHK=454;
+const LEYE_C=159, REYE_C=386, LEYE_L=33, REYE_R=263, LIP_T=13;
+const LBROW=[70,63,105,66,107], RBROW=[336,296,334,293,300];
+
+// ── MediaPipe init ────────────────────────────────────────────────────────────
+let readyCount = 0;
+function checkReady() {
+  readyCount++;
+  if (readyCount === 2) status.textContent = 'Siap! Hadapkan wajah ke kamera 😊';
+}
+
+const faceMesh = new FaceMesh({ locateFile: f =>
+  `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${f}` });
+faceMesh.setOptions({ maxNumFaces:1, refineLandmarks:true,
+  minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
+faceMesh.onResults(r => { faceLM = r.multiFaceLandmarks?.[0] || null; });
+
+const handsMP = new Hands({ locateFile: f =>
+  `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
+handsMP.setOptions({ maxNumHands:2, modelComplexity:1,
+  minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
+handsMP.onResults(r => { handLMs = r.multiHandLandmarks || []; });
+
+faceMesh.initialize().then(checkReady).catch(()=>{ readyCount++; });
+handsMP.initialize().then(checkReady).catch(()=>{ readyCount++; });
+
+// ── Camera ───────────────────────────────────────────────────────────────────
+navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:640, height:480 }, audio:false })
+  .then(s => {
+    video.srcObject = s;
+    video.onloadedmetadata = () => {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      loop();
+    };
+  })
+  .catch(() => status.textContent = '❌ Kamera tidak bisa diakses');
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function P(i) {
+  if (!faceLM) return null;
+  return { x: faceLM[i].x * canvas.width, y: faceLM[i].y * canvas.height };
+}
+
+// ── Skull mesh ────────────────────────────────────────────────────────────────
+function drawSkull() {
+  if (!faceLM) return;
+  ctx.save();
+  const CONNS = [
+    [10,338],[338,297],[297,332],[332,284],[284,251],[251,389],[389,356],[356,454],
+    [454,323],[323,361],[361,288],[288,397],[397,365],[365,379],[379,378],[378,400],
+    [400,377],[377,152],[152,148],[148,176],[176,149],[149,150],[150,136],[136,172],
+    [172,58],[58,132],[132,93],[93,234],[234,127],[127,162],[162,21],[21,54],[54,103],
+    [103,67],[67,109],[109,10],
+    [168,6],[6,197],[197,195],[195,5],[5,4],[4,1],
+    [33,246],[246,161],[161,160],[160,159],[159,158],[158,157],[157,173],
+    [133,155],[155,154],[154,153],[153,145],[145,144],[144,163],[163,7],[7,33],
+    [362,398],[398,384],[384,385],[385,386],[386,387],[387,388],[466,263],
+    [263,249],[249,390],[390,373],[373,374],[374,380],[380,381],[381,382],[382,362],
+  ];
+  ctx.strokeStyle = 'rgba(0,255,100,0.6)';
+  ctx.lineWidth = 0.9;
+  for (const [a,b] of CONNS) {
+    const pa = faceLM[a], pb = faceLM[b];
+    ctx.beginPath();
+    ctx.moveTo(pa.x*canvas.width, pa.y*canvas.height);
+    ctx.lineTo(pb.x*canvas.width, pb.y*canvas.height);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(0,255,100,0.7)';
+  for (const p of faceLM) {
+    ctx.beginPath();
+    ctx.arc(p.x*canvas.width, p.y*canvas.height, 0.9, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ── Stickers ──────────────────────────────────────────────────────────────────
+function drawStickers() {
+  if (!faceLM) return;
+  const nose=P(NOSE), fore=P(FORE), chin=P(CHIN);
+  const lc=P(LCHK), rc=P(RCHK);
+  if (!nose||!fore||!chin||!lc||!rc) return;
+
+  const fW = Math.abs(rc.x - lc.x);
+  const fH = Math.abs(chin.y - fore.y);
+  ctx.save();
+
+  // 🎩 Top hat
+  const hW = fW*1.15, hH = fH*0.55;
+  const hX = fore.x - hW/2, hY = fore.y - hH*1.1;
+  // brim
+  ctx.fillStyle='#0d0600'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.ellipse(fore.x, hY+hH+3, hW*0.65, hH*0.13, 0, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+  // body
+  ctx.fillStyle='#0d0600';
+  ctx.beginPath();
+  ctx.roundRect(hX+hW*0.08, hY, hW*0.84, hH, 5);
+  ctx.fill(); ctx.stroke();
+  // gold band
+  ctx.fillStyle='#f5c518';
+  ctx.fillRect(hX+hW*0.08, hY+hH*0.76, hW*0.84, hH*0.11);
+  // buckle
+  ctx.strokeStyle='#0d0600'; ctx.lineWidth=1;
+  ctx.strokeRect(fore.x-7, hY+hH*0.76, 14, hH*0.11);
+
+  // 👓 Glasses
+  const eyeY = (P(LEYE_C).y + P(REYE_C).y)/2;
+  const lCx=P(LEYE_C).x, rCx=P(REYE_C).x;
+  const lR=fW*0.18;
+  ctx.strokeStyle='#f5c518'; ctx.lineWidth=2.5;
+  ctx.fillStyle='rgba(245,197,24,0.10)';
+  ctx.beginPath(); ctx.arc(lCx,eyeY,lR,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(rCx,eyeY,lR,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lCx+lR,eyeY); ctx.lineTo(rCx-lR,eyeY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lCx-lR,eyeY); ctx.lineTo(P(LEYE_L).x-fW*0.08,eyeY-4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(rCx+lR,eyeY); ctx.lineTo(P(REYE_R).x+fW*0.08,eyeY-4); ctx.stroke();
+
+  // 👨 Moustache
+  const lip=P(LIP_T);
+  const mY=(nose.y+lip.y)/2, mW=fW*0.38;
+  ctx.fillStyle='#2a0f00'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=1.5;
+  // left
+  ctx.beginPath();
+  ctx.moveTo(nose.x,mY);
+  ctx.bezierCurveTo(nose.x-mW*0.25,mY-7, nose.x-mW,mY+5, nose.x-mW*0.88,mY+11);
+  ctx.bezierCurveTo(nose.x-mW*0.55,mY+15, nose.x-mW*0.18,mY+9, nose.x,mY);
+  ctx.fill(); ctx.stroke();
+  // right
+  ctx.beginPath();
+  ctx.moveTo(nose.x,mY);
+  ctx.bezierCurveTo(nose.x+mW*0.25,mY-7, nose.x+mW,mY+5, nose.x+mW*0.88,mY+11);
+  ctx.bezierCurveTo(nose.x+mW*0.55,mY+15, nose.x+mW*0.18,mY+9, nose.x,mY);
+  ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+}
+
+// ── Quote bubble ──────────────────────────────────────────────────────────────
+function drawQuote() {
+  if (!faceLM) return;
+  const fore = P(FORE);
+  if (!fore) return;
+  qTimer++;
+  if (qTimer > 150) { qTimer=0; quote=QUOTES[Math.floor(Math.random()*QUOTES.length)]; }
+
+  ctx.save();
+  const fs = Math.max(13, canvas.width*0.030);
+  ctx.font = `bold ${fs}px 'Courier New',monospace`;
+  const tw = ctx.measureText(quote).width;
+  const pad=10, qx=fore.x, qy=Math.max(fore.y-36, fs+pad);
+  ctx.fillStyle='rgba(0,0,0,0.70)';
+  ctx.strokeStyle='#f5c518'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.roundRect(qx-tw/2-pad, qy-fs-4, tw+pad*2, fs+12, 8);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#f5c518';
+  ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText(quote, qx, qy+3);
+  ctx.restore();
+}
+
+// ── Hand skeleton ─────────────────────────────────────────────────────────────
+const HC=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+
+function drawHands() {
+  const COLS=['#00e5ff','#ff6ec7'];
+  for (let hi=0; hi<handLMs.length; hi++) {
+    const hl=handLMs[hi], col=COLS[hi%2];
+    ctx.save();
+    ctx.strokeStyle=col; ctx.lineWidth=2.2;
+    for (const [a,b] of HC) {
+      ctx.beginPath();
+      ctx.moveTo(hl[a].x*canvas.width, hl[a].y*canvas.height);
+      ctx.lineTo(hl[b].x*canvas.width, hl[b].y*canvas.height);
+      ctx.stroke();
+    }
+    ctx.fillStyle=col;
+    for (const p of hl) {
+      ctx.beginPath();
+      ctx.arc(p.x*canvas.width, p.y*canvas.height, 2.5, 0, Math.PI*2);
+      ctx.fill();
+    }
+    for (const t of [4,8,12,16,20]) {
+      ctx.beginPath();
+      ctx.arc(hl[t].x*canvas.width, hl[t].y*canvas.height, 5, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+let fc=0;
+async function loop() {
+  canvas.width  = video.videoWidth  || canvas.width;
+  canvas.height = video.videoHeight || canvas.height;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Send frames to mediapipe (staggered)
+  fc++;
+  if (video.readyState>=2) {
+    if (fc%2===0) faceMesh.send({image:video}).catch(()=>{});
+    if (fc%3===0) handsMP.send({image:video}).catch(()=>{});
+  }
+
+  if (feat.skull)   drawSkull();
+  if (feat.sticker && faceLM) drawStickers();
+  if (feat.quote  && faceLM) drawQuote();
+  if (feat.hand   && handLMs.length) drawHands();
+
+  // Face indicator dot
+  ctx.fillStyle = faceLM ? '#00ff80' : '#ff4444';
+  ctx.beginPath(); ctx.arc(12,12,6,0,Math.PI*2); ctx.fill();
+  if (faceLM) {
+    ctx.fillStyle='rgba(0,255,128,0.18)';
+    ctx.beginPath(); ctx.arc(12,12,13,0,Math.PI*2); ctx.fill();
+  }
+
+  status.textContent = readyCount<2
+    ? 'Memuat model AI...'
+    : (faceLM ? '😊 Wajah terdeteksi — siap foto!' : '👀 Hadapkan wajah ke kamera...');
+
+  requestAnimationFrame(loop);
+}
+
+// ── Capture photo ─────────────────────────────────────────────────────────────
+captBtn.addEventListener('click', () => {
+  // Flash effect
+  flash.style.opacity='1';
+  setTimeout(()=>{ flash.style.transition='opacity 0.3s'; flash.style.opacity='0';
+    setTimeout(()=>{ flash.style.transition=''; },300); },50);
+
+  const cap = document.createElement('canvas');
+  cap.width=canvas.width; cap.height=canvas.height;
+  const cc=cap.getContext('2d');
+
+  // Draw video mirrored (natural selfie orientation)
+  cc.save();
+  cc.translate(cap.width,0); cc.scale(-1,1);
+  cc.drawImage(video,0,0,cap.width,cap.height);
+  cc.restore();
+
+  // Draw overlays (landmarks were computed on mirrored preview coords, so also flip)
+  cc.save();
+  cc.translate(cap.width,0); cc.scale(-1,1);
+  cc.drawImage(canvas,0,0);
+  cc.restore();
+
+  const dataUrl = cap.toDataURL('image/jpeg', 0.93);
+
+  // Send to Streamlit via postMessage
+  window.parent.postMessage({ type:'PHOTO_CAPTURED', dataUrl }, '*');
+
+  // Also try direct input injection as fallback
+  try {
+    const allInputs = window.parent.document.querySelectorAll('input[aria-label="cam_bridge"]');
+    if (allInputs.length) {
+      allInputs[0].value = dataUrl;
+      allInputs[0].dispatchEvent(new Event('input',{bubbles:true}));
+    }
+  } catch(e){}
+});
+</script>
+</body>
+</html>"""
 
 # ── Session state ──────────────────────────────────────────────────────────────
 if "photo" not in st.session_state:
@@ -508,12 +880,37 @@ with col_left:
     input_mode = st.radio("Sumber foto", ["📷 Webcam", "📁 Upload File"], horizontal=True, label_visibility="collapsed")
 
     if input_mode == "📷 Webcam":
-        cam_img = st.camera_input("Klik tombol kamera untuk mengambil foto", label_visibility="visible")
-        if cam_img:
-            raw = Image.open(cam_img)
-            # ✅ Fix mirror: flip horizontal untuk selfie kamera depan
-            st.session_state.photo = ImageOps.mirror(raw)
+        # ── AR Camera ────────────────────────────────────────────────────────
+        components.html(get_ar_camera_html(), height=560, scrolling=False)
+
+        # Bridge: JS postMessage → Streamlit text_input
+        # The JS in the iframe sends postMessage to parent; this sibling iframe
+        # listens and injects into the text_input below.
+        components.html("""
+        <script>
+        window.addEventListener('message', function(e) {
+          if (e.data && e.data.type === 'PHOTO_CAPTURED') {
+            // Target our labelled input
+            const inp = window.parent.document.querySelector('input[aria-label="cam_bridge"]');
+            if (inp) {
+              const nativeInput = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+              nativeInput.set.call(inp, e.data.dataUrl);
+              inp.dispatchEvent(new Event('input', {bubbles:true}));
+            }
+          }
+        });
+        </script>
+        """, height=0)
+
+        # Hidden bridge input — receives base64 from JS above
+        raw_b64 = st.text_input("cam_bridge", key="cam_bridge", label_visibility="collapsed")
+        if raw_b64 and raw_b64.startswith("data:image"):
+            header, b64data = raw_b64.split(",", 1)
+            img_bytes = base64.b64decode(b64data)
+            st.session_state.photo = Image.open(io.BytesIO(img_bytes))
+            st.session_state["cam_bridge"] = ""
             st.success("✅ Foto berhasil diambil!")
+            st.rerun()
     else:
         uploaded = st.file_uploader(
             "Upload foto (JPG, PNG)",
@@ -521,6 +918,7 @@ with col_left:
             label_visibility="visible",
         )
         if uploaded:
+            # File upload: tidak perlu mirror, sudah benar orientasinya
             st.session_state.photo = Image.open(uploaded)
             st.success("✅ Foto berhasil diupload!")
 
