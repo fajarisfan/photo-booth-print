@@ -1344,23 +1344,29 @@ Filter: Normal · Hitam Putih · Vintage · Cool Blue · Golden Hour · Faded ·
 """, unsafe_allow_html=True)
 
 # ── Tombol Interaktif Kejutan untuk Zizah ─────────────────────────────────────────
-# Begitu tombol diklik, hanya menampilkan gambar screenshot dan kalimat biasa
 if st.button("👉 Klik bentar, Zah..."):
     
-    # 1. Tampilkan Gambar Screenshot Chat HRD Polos
+    # 1. Mainkan Efek Suara Gemericik Air Kali (Autoplay Aktif)
+    st.audio("https://www.soundjay.com/nature/sounds/river-1.mp3", format="audio/mp3", autoplay=True)
+    
+    # 2. Tampilkan Gambar Screenshot Chat HRD Polos
     st.image(
         "https://i.postimg.cc/2Sc9t3vH/Screenshot-20260604-150953.png", 
         use_container_width=True
     )
     
-    # Memberi jarak spasi dikit antara gambar dan tulisan
     st.write("")
     
-    # 2. Tampilkan Kalimat Murni Tanpa Kode HTML Sama Sekali
+    # 3. Tampilkan Kalimat Polos Cerita Lu
     st.write("Zah, di atas itu bukti obrolan gua sama Pak Ageng (Recruiter HTC Global Services). Gua sengaja pajang di sini biar lu tahu semuanya secara terbuka. Gua rela ngambil langkah sejauh ini, nembus tantangan baru ke Jakarta, karena gua pengen nyari finansial yang lebih baik. Gua pengen berjuang di tempat yang bener-bener ngehargai hasil kerja keras gua.")
     
     st.write("Tapi dari skrip ini gua mau lu tahu, lu gak usah khawatir, gua gabakal lupain lu, Zah. Gua kagum banget sama lu. Lu itu wanita mandiri, tipe cewek yang susah buat dideketin, dan jujur... cewek kayak lu yang emang gua cari selama ini.")
     
     st.write("Sekarang bukannya gua menghilang atau ngejauh. Tapi setiap kali lu bales DM gua, gua sengaja mikir berkali-kali dulu mau bales apa. Biar apa? Biar lu gak marah, dan biar obrolan kita tuh bisa nambah asik ke depannya.")
     
-    st.write("Inget masalah matcha kemarin? Apesnya lu, apesnya gua juga kan? Gara-gara salah transfer itu, gua mikir... emang kita kayaknya gabisa dipisah-pisahin, Zah. ❤️")
+    # Bagian cerita apes yang udah disinkronkan:
+    st.write("Inget masalah kemarin? Apesnya lu gara-gara salah transfer, eh apesnya gua juga pas ngirim matcha malah nyangkut ditahan di security wkwk. Gara-gara drama sama-sama apes itu, gua mikir... emang kita kayaknya gabisa dipisah-pisahin, Zah. ❤️")
+    
+    st.write("Nanti gua di Jakarta sendirian, tapi entah kenapa di pikiran gua nama lu terus yang lewat. Nomor gua masih sama kok, aktif terus 24 jam. Jadi kalau lu mau ninggalin pesan di aplikasi ini atau mau ngabarin langsung, pintu gua selalu kebuka. Tenang aja, urusan matcha yang gagal kemarin tetep bakal gua ganti dan kirim lagi nanti, ntar gua DM lu lagi ya, wkwk.")
+    
+    st.write("Doain gua ya, kalo masih ada kesempatan gua bakal prioritasin lu jadi nomor satu, tapi kalo bukan lu gua berdoa semoga yang gak itu tetap lu wkwkw")
