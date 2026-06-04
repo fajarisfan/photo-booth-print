@@ -11,7 +11,7 @@ import datetime
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Photo Booth Cetak",
+    page_title="Photo Booth dan Cetak Foto",
     page_icon="📸",
     layout="wide",
 )
