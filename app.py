@@ -1342,3 +1342,129 @@ Template: Pas Foto 2×3 · 3×4 · 4×6 · Strip Polaroid · Photo Booth Grid ·
 Filter: Normal · Hitam Putih · Vintage · Cool Blue · Golden Hour · Faded · Vivid · Sepia · Noir · Pastel · Neon · Film Grain
 </div>
 """, unsafe_allow_html=True)
+# ── Tampilkan screenshot chat HRD ─────────────────────────────────────────────
+st.image("Screenshot_20260604-135129.jpg", caption="⚔️ Active Quest: Career Path Transition", use_container_width=True)
+
+# ── Surat untuk Zizah ─────────────────────────────────────────────────────────
+pesan_zizah_html = """
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Spectral:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+<style>
+  .scroll-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    width: 100%;
+    padding: 8px 0 24px 0;
+    box-sizing: border-box;
+  }
+
+  .scroll-card {
+    background: #2C1A10;
+    border: 2px dashed #CA8A04;
+    border-radius: 12px;
+    max-width: 680px;
+    width: 100%;
+    padding: 32px 28px 36px 28px;
+    box-sizing: border-box;
+    box-shadow:
+      0 0 18px rgba(202, 138, 4, 0.25),
+      0 0 40px rgba(202, 138, 4, 0.10),
+      inset 0 0 30px rgba(0, 0, 0, 0.35);
+    position: relative;
+  }
+
+  .scroll-card::before,
+  .scroll-card::after {
+    content: "✦";
+    font-size: 18px;
+    color: #CA8A04;
+    position: absolute;
+    opacity: 0.7;
+  }
+  .scroll-card::before { top: 12px; left: 16px; }
+  .scroll-card::after  { bottom: 12px; right: 16px; }
+
+  .scroll-title {
+    font-family: 'Cinzel', 'Times New Roman', serif;
+    font-size: clamp(15px, 4vw, 20px);
+    font-weight: 700;
+    color: #CA8A04;
+    text-align: center;
+    letter-spacing: 2.5px;
+    margin: 0 0 20px 0;
+    text-shadow: 0 0 12px rgba(202, 138, 4, 0.45);
+  }
+
+  .scroll-divider {
+    border: none;
+    border-top: 1px solid rgba(202, 138, 4, 0.4);
+    margin: 0 0 22px 0;
+  }
+
+  .scroll-body {
+    font-family: 'Spectral', Georgia, 'Times New Roman', serif;
+    font-size: clamp(14px, 3.5vw, 16px);
+    line-height: 1.85;
+    color: #F5E6D3;
+    text-align: justify;
+    hyphens: auto;
+  }
+
+  .scroll-body p {
+    margin: 0 0 16px 0;
+  }
+
+  .scroll-body p:last-child {
+    margin-bottom: 0;
+  }
+
+  .heart-beat {
+    display: inline-block;
+    animation: heartbeat 1.4s ease-in-out infinite;
+    transform-origin: center;
+  }
+
+  @keyframes heartbeat {
+    0%   { transform: scale(1);    }
+    14%  { transform: scale(1.25); }
+    28%  { transform: scale(1);    }
+    42%  { transform: scale(1.18); }
+    56%  { transform: scale(1);    }
+    100% { transform: scale(1);    }
+  }
+
+  .scroll-footer {
+    margin-top: 24px;
+    text-align: right;
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    color: rgba(202, 138, 4, 0.55);
+    letter-spacing: 1.5px;
+  }
+</style>
+
+<div class="scroll-wrapper">
+  <div class="scroll-card">
+
+    <div class="scroll-title">📜 THE TRUTH BEHIND THE QUEST</div>
+    <hr class="scroll-divider">
+
+    <div class="scroll-body">
+      <p>Zah, di atas itu bukti obrolan gua sama Pak Ageng (Recruiter HTC Global Services). Gua sengaja pajang di sini biar lu tahu semuanya secara terbuka. Gua rela ngambil langkah sejauh ini, nembus tantangan baru ke Jakarta, karena gua pengen nyari finansial yang lebih baik. Gua pengen berjuang di tempat yang bener-bener ngehargai hasil kerja keras gua.</p>
+
+      <p>Tapi dari skrip ini gua mau lu tahu, lu gak usah khawatir, gua gabakal lupain lu, Zah. Gua kagum banget sama lu. Lu itu wanita mandiri, tipe cewek yang susah buat dideketin, dan jujur... cewek kayak lu yang emang gua cari selama ini.</p>
+
+      <p>Sekarang bukannya gua menghilang atau ngejauh. Tapi setiap kali lu bales DM gua, gua sengaja mikir berkali-kali dulu mau bales apa. Biar apa? Biar lu gak marah, dan biar obrolan kita tuh bisa nambah asik ke depannya.</p>
+
+      <p>Inget masalah matcha kemarin? Apesnya lu, apesnya gua juga kan? Gara-gara salah transfer itu, gua mikir... emang kita kayaknya gabisa dipisah-pisahin, Zah. <span class="heart-beat">❤️</span></p>
+    </div>
+
+    <div class="scroll-footer">— sealed with gold & sincerity —</div>
+
+  </div>
+</div>
+"""
+
+# ── Render ke Streamlit ────────────────────────────────────────────────────────
+st.markdown(pesan_zizah_html, unsafe_allow_html=True)
