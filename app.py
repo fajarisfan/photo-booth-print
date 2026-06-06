@@ -213,6 +213,46 @@ TEMPLATES = {
         "border": 0,
         "style": "frame_dark",
     },
+    "romance_filmstrip": {
+        "name": "💕 Filmstrip Memories",
+        "w": 5.5, "h": 4.0,
+        "cols": 3, "rows": 1,
+        "desc": "3 foto horizontal\nFilmstrip romantis",
+        "icon": "🎞️",
+        "bg_color": (255, 245, 240),
+        "border": 0,
+        "style": "romance_filmstrip",
+    },
+    "romance_destined": {
+        "name": "💗 Destined Together",
+        "w": 7.0, "h": 9.5,
+        "cols": 1, "rows": 1,
+        "desc": "1 foto\nFrame ornamen romantis",
+        "icon": "💗",
+        "bg_color": (255, 248, 245),
+        "border": 0,
+        "style": "romance_destined",
+    },
+    "romance_keepsake": {
+        "name": "💛 Keepsake",
+        "w": 10.0, "h": 6.0,
+        "cols": 3, "rows": 1,
+        "desc": "3 foto horizontal\nGaya keepsake vintage",
+        "icon": "💛",
+        "bg_color": (255, 250, 235),
+        "border": 0,
+        "style": "romance_keepsake",
+    },
+    "romance_lovenotes": {
+        "name": "💌 Love Notes",
+        "w": 7.5, "h": 9.5,
+        "cols": 1, "rows": 1,
+        "desc": "1 foto\nAmplop surat cinta",
+        "icon": "💌",
+        "bg_color": (255, 248, 240),
+        "border": 0,
+        "style": "romance_lovenotes",
+    },
 }
 
 # ── Photo Filter / Tema definitions ───────────────────────────────────────────
@@ -576,14 +616,338 @@ def build_frame_sheet(photo: Image.Image, tpl: dict, filter_key: str) -> Image.I
         draw.text((tx, ty), label, fill=(180, 140, 0), font=font)
         return sheet
 
+    # ── Romance frames ────────────────────────────────────────────────────────
+    elif style == "romance_filmstrip":
+        # Filmstrip Memories: 3 photos horizontal, film border, floral accents text
+        DPI_ = 300; CM_ = DPI_ / 2.54
+        def cm2(v): return int(v * CM_)
+        pw = cm2(18.0); ph = cm2(9.0)
+        bg_col = (255, 245, 240)
+        sheet = Image.new("RGB", (pw, ph), bg_col)
+        draw = ImageDraw.Draw(sheet)
+
+        # Film strip dark bar top and bottom
+        strip_h = cm2(0.7)
+        draw.rectangle([0, 0, pw, strip_h], fill=(80, 45, 25))
+        draw.rectangle([0, ph - strip_h, pw, ph], fill=(80, 45, 25))
+
+        # Film holes
+        hole_w, hole_h = cm2(0.25), cm2(0.35)
+        hole_y_top = (strip_h - hole_h) // 2
+        hole_y_bot = ph - strip_h + (strip_h - hole_h) // 2
+        for hx in range(cm2(0.3), pw - cm2(0.2), cm2(0.9)):
+            draw.rounded_rectangle([hx, hole_y_top, hx+hole_w, hole_y_top+hole_h], radius=3, fill=(220, 195, 160))
+            draw.rounded_rectangle([hx, hole_y_bot, hx+hole_w, hole_y_bot+hole_h], radius=3, fill=(220, 195, 160))
+
+        # 3 photo cells
+        cell_margin = cm2(0.4)
+        cell_gap = cm2(0.3)
+        content_y = strip_h + cm2(0.2)
+        content_h = ph - strip_h * 2 - cm2(0.4)
+        total_cell_w = pw - cell_margin * 2 - cell_gap * 2
+        cell_w_each = total_cell_w // 3
+        for i in range(3):
+            cx = cell_margin + i * (cell_w_each + cell_gap)
+            cell_img = fit_crop(filtered, cell_w_each, content_h)
+            draw.rectangle([cx-2, content_y-2, cx+cell_w_each+2, content_y+content_h+2], outline=(120, 80, 50), width=2)
+            sheet.paste(cell_img, (cx, content_y))
+
+        # Bottom text area
+        try:
+            font_big = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cm2(0.38))
+            font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", cm2(0.25))
+        except Exception:
+            font_big = font_small = ImageFont.load_default()
+
+        texts = [("OUR FAV MOMENTS", (120, 50, 50), font_big, ph - strip_h + cm2(0.1)),]
+        for txt, col, fnt, ty in texts:
+            bbox = draw.textbbox((0,0), txt, font=fnt)
+            tx = (pw - (bbox[2]-bbox[0])) // 2
+            if ty + bbox[3] - bbox[1] < ph:
+                draw.text((tx, ty), txt, fill=col, font=fnt)
+        return sheet
+
+    elif style == "romance_destined":
+        DPI_ = 300; CM_ = DPI_ / 2.54
+        def cm2(v): return int(v * CM_)
+        pw, ph = cm2(tpl["w"]), cm2(tpl["h"])
+        bg_col = (255, 248, 245)
+        sheet = Image.new("RGB", (pw, ph), bg_col)
+        draw = ImageDraw.Draw(sheet)
+
+        # Ornate border — double rectangle with gold/rose
+        brd = cm2(0.4)
+        draw.rectangle([brd, brd, pw-brd, ph-brd], outline=(200, 160, 100), width=3)
+        draw.rectangle([brd+8, brd+8, pw-brd-8, ph-brd-8], outline=(230, 180, 150), width=1)
+
+        # Corner hearts
+        for cx, cy in [(brd+cm2(0.1), brd+cm2(0.1)), (pw-brd-cm2(0.5), brd+cm2(0.1)),
+                       (brd+cm2(0.1), ph-brd-cm2(0.5)), (pw-brd-cm2(0.5), ph-brd-cm2(0.5))]:
+            draw.text((cx, cy), "♥", fill=(200, 100, 120), font=ImageFont.load_default())
+
+        # Title top
+        pad_top = cm2(1.2)
+        try:
+            font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf", cm2(0.5))
+            font_sub   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", cm2(0.28))
+        except Exception:
+            font_title = font_sub = ImageFont.load_default()
+
+        title = "Destined Together"
+        tb = draw.textbbox((0,0), title, font=font_title)
+        draw.text(((pw - (tb[2]-tb[0]))//2, cm2(0.5)), title, fill=(170, 80, 100), font=font_title)
+
+        # Heart icon
+        draw.text(((pw - cm2(0.5))//2, cm2(1.1)), "♥", fill=(200, 100, 120), font=font_title)
+
+        # Photo cell
+        pad_side = cm2(1.2)
+        cell_top = cm2(2.0)
+        cell_bot_margin = cm2(2.2)
+        inner_w = pw - pad_side * 2
+        inner_h = ph - cell_top - cell_bot_margin
+        cell_img = fit_crop(filtered, inner_w, inner_h)
+        draw.rectangle([pad_side-3, cell_top-3, pad_side+inner_w+3, cell_top+inner_h+3],
+                       outline=(200, 160, 100), width=3)
+        sheet.paste(cell_img, (pad_side, cell_top))
+
+        # Bottom text
+        bottom_y = cell_top + inner_h + cm2(0.2)
+        sub_texts = ["US AGAINST THE WORLD", "♥", "FOR: [Crush Name]"]
+        sub_cols  = [(130, 70, 80), (200, 100, 120), (120, 90, 100)]
+        for i, (txt, col) in enumerate(zip(sub_texts, sub_cols)):
+            fnt = font_sub if i != 1 else font_title
+            bb = draw.textbbox((0,0), txt, font=fnt)
+            tx = (pw - (bb[2]-bb[0])) // 2
+            draw.text((tx, bottom_y + i*cm2(0.4)), txt, fill=col, font=fnt)
+        return sheet
+
+    elif style == "romance_keepsake":
+        DPI_ = 300; CM_ = DPI_ / 2.54
+        def cm2(v): return int(v * CM_)
+        pw = cm2(tpl["w"]); ph = cm2(tpl["h"])
+        bg_col = (255, 250, 235)
+        sheet = Image.new("RGB", (pw, ph), bg_col)
+        draw = ImageDraw.Draw(sheet)
+
+        # Warm border
+        draw.rectangle([cm2(0.2), cm2(0.2), pw-cm2(0.2), ph-cm2(0.2)],
+                       outline=(210, 160, 80), width=3)
+
+        try:
+            font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cm2(0.55))
+            font_sub   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", cm2(0.3))
+            font_label = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cm2(0.28))
+        except Exception:
+            font_title = font_sub = font_label = ImageFont.load_default()
+
+        # KEEPSAKE title top right
+        tb = draw.textbbox((0,0), "KEEPSAKE", font=font_title)
+        draw.text((pw - (tb[2]-tb[0]) - cm2(0.5), cm2(0.35)), "KEEPSAKE", fill=(180, 100, 60), font=font_title)
+        draw.text((pw - (tb[2]-tb[0]) - cm2(0.5) + 5, cm2(0.35)+2), "♥", fill=(200, 80, 80), font=font_sub)
+
+        # 3 photo cells with YOU / ME / TOGETHER labels
+        labels_top = ["YOU.", "ME.", ""]
+        labels_bot = ["YOU.", "TOGETHER.", "OUR STORY"]
+        cell_gap = cm2(0.35)
+        cell_margin_x = cm2(0.5)
+        cell_margin_y = cm2(1.0)
+        cell_bot_margin = cm2(1.5)
+        content_h = ph - cell_margin_y - cell_bot_margin
+        total_w = pw - cell_margin_x * 2 - cell_gap * 2
+        cell_w_each = total_w // 3
+
+        label_colors = [(200, 80, 60), (180, 120, 50), (150, 80, 80)]
+        for i in range(3):
+            cx = cell_margin_x + i * (cell_w_each + cell_gap)
+            # slight size variation for aesthetic
+            cell_offset = cm2(0.3) if i % 2 == 1 else 0
+            ch = content_h - cell_offset
+            cell_img = fit_crop(filtered, cell_w_each, ch)
+            # colored frame per cell
+            frame_cols = [(210, 100, 60), (190, 150, 60), (200, 100, 100)]
+            draw.rectangle([cx-3, cell_margin_y+cell_offset-3, cx+cell_w_each+3, cell_margin_y+cell_offset+ch+3],
+                           outline=frame_cols[i], width=3)
+            sheet.paste(cell_img, (cx, cell_margin_y + cell_offset))
+
+            # Labels
+            if labels_top[i]:
+                ltb = draw.textbbox((0,0), labels_top[i], font=font_label)
+                draw.text((cx, cell_margin_y + cell_offset - cm2(0.4)),
+                          labels_top[i], fill=label_colors[i], font=font_label)
+            if labels_bot[i]:
+                draw.text((cx, cell_margin_y + cell_offset + ch + cm2(0.05)),
+                          labels_bot[i], fill=label_colors[i], font=font_label)
+
+        # Bottom credits
+        draw.text((cm2(0.5), ph - cm2(1.2)), "FOR: MY SPECIAL SOMEONE", fill=(160, 100, 70), font=font_sub)
+        draw.text((pw//2 - cm2(1), ph - cm2(1.2)), "PERFECT MATCH", fill=(180, 130, 50), font=font_label)
+        return sheet
+
+    elif style == "romance_lovenotes":
+        DPI_ = 300; CM_ = DPI_ / 2.54
+        def cm2(v): return int(v * CM_)
+        pw, ph = cm2(tpl["w"]), cm2(tpl["h"])
+        bg_col = (255, 248, 240)
+        sheet = Image.new("RGB", (pw, ph), bg_col)
+        draw = ImageDraw.Draw(sheet)
+
+        # Envelope background shape
+        env_top = cm2(3.5)
+        env_col = (245, 225, 200)
+        # Envelope body
+        draw.rectangle([cm2(0.4), env_top, pw-cm2(0.4), ph-cm2(0.4)], fill=env_col, outline=(200, 160, 110), width=2)
+        # Envelope flap (triangle on top)
+        flap_pts = [(cm2(0.4), env_top), (pw//2, env_top + cm2(2.0)), (pw-cm2(0.4), env_top)]
+        draw.polygon(flap_pts, fill=(235, 210, 175), outline=(200, 160, 110))
+
+        # Wax seal circle
+        seal_x = pw//2 - cm2(0.6)
+        seal_y = env_top + cm2(0.8)
+        seal_r = cm2(0.6)
+        draw.ellipse([seal_x, seal_y, seal_x+seal_r*2, seal_y+seal_r*2], fill=(160, 60, 60), outline=(130, 40, 40), width=2)
+        draw.text((seal_x + seal_r - cm2(0.15), seal_y + seal_r - cm2(0.25)), "♥", fill=(255, 200, 200), font=ImageFont.load_default())
+
+        try:
+            font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cm2(0.65))
+            font_sub   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", cm2(0.28))
+            font_note  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf", cm2(0.22))
+        except Exception:
+            font_title = font_sub = font_note = ImageFont.load_default()
+
+        # LOVE NOTES title top
+        draw.text((cm2(0.3), cm2(0.35)), "LOVE NOTES", fill=(180, 60, 80), font=font_title)
+        draw.text((pw - cm2(1.5), cm2(0.4)), "♥", fill=(200, 100, 120), font=font_title)
+
+        # Arrow decoration
+        draw.line([(cm2(0.5), cm2(1.3)), (pw - cm2(0.5), cm2(1.3))], fill=(200, 140, 100), width=2)
+        draw.text((pw//2 - cm2(0.3), cm2(1.0)), "→", fill=(180, 120, 80), font=font_sub)
+
+        # Photo cell inside envelope
+        pad_side = cm2(0.9)
+        photo_top = env_top + cm2(2.0)
+        photo_bot_margin = cm2(2.2)
+        inner_w = pw - pad_side * 2
+        inner_h = ph - photo_top - photo_bot_margin
+        if inner_h > 0 and inner_w > 0:
+            cell_img = fit_crop(filtered, inner_w, inner_h)
+            draw.rectangle([pad_side-3, photo_top-3, pad_side+inner_w+3, photo_top+inner_h+3],
+                           outline=(200, 140, 100), width=3)
+            sheet.paste(cell_img, (pad_side, photo_top))
+
+        # Italic love note text lines (decorative)
+        note_lines = ["Love is more than", "you can think of", "but two..."]
+        for i, line in enumerate(note_lines):
+            draw.text((cm2(0.5), ph - cm2(1.8) + i * cm2(0.35)), line, fill=(180, 140, 120), font=font_note)
+            draw.text((pw//2 + cm2(0.2), ph - cm2(1.8) + i * cm2(0.35)), line, fill=(180, 140, 120), font=font_note)
+
+        # Bottom text
+        bsub = "I'D PICK YOU EVERY TIME"
+        bb = draw.textbbox((0,0), bsub, font=font_sub)
+        draw.text(((pw - (bb[2]-bb[0]))//2, ph - cm2(1.0)), bsub, fill=(160, 80, 80), font=font_sub)
+
+        # Arrow bottom
+        draw.line([(cm2(0.5), ph - cm2(0.55)), (pw - cm2(0.5), ph - cm2(0.55))], fill=(200, 140, 100), width=2)
+        draw.text((cm2(0.5), ph - cm2(0.5)), "→", fill=(180, 120, 80), font=font_sub)
+        return sheet
+
     # fallback
     return build_sheet(photo, tpl, filter_key)
 
 
+LOGO_FONTS = {
+    "Bold (Default)": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "Regular": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "Italic": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
+    "Bold Italic": "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",
+    "Mono": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+    "Serif": "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
+    "Serif Bold": "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf",
+    "Serif Italic": "/usr/share/fonts/truetype/freefont/FreeSerifItalic.ttf",
+}
+
+LOGO_SHAPES = {
+    "none": "Tanpa Badge",
+    "rectangle": "Kotak",
+    "rounded_rect": "Kotak Rounded",
+    "ellipse": "Oval/Lingkaran",
+    "banner": "Banner Ribbon",
+    "diamond": "Berlian",
+    "star_badge": "Bintang (notch)",
+}
+
+def draw_logo_badge(draw_obj, text, sub_text, x, y, w, h,
+                    font_key="Bold (Default)", shape="none",
+                    text_color=(180, 40, 40), badge_color=(255, 255, 255),
+                    border_color=(200, 200, 200), font_size_px=60, sub_font_size_px=28):
+    """Draw a customizable logo badge onto draw at given area."""
+    try:
+        font_path = LOGO_FONTS.get(font_key, LOGO_FONTS["Bold (Default)"])
+        font_main = ImageFont.truetype(font_path, font_size_px)
+        font_sub_f = ImageFont.truetype(font_path, sub_font_size_px)
+    except Exception:
+        font_main = font_sub_f = ImageFont.load_default()
+
+    bb_main = draw_obj.textbbox((0, 0), text, font=font_main)
+    text_w = bb_main[2] - bb_main[0]
+    text_h = bb_main[3] - bb_main[1]
+
+    bb_sub = draw_obj.textbbox((0, 0), sub_text, font=font_sub_f) if sub_text else (0,0,0,0)
+    sub_w = bb_sub[2] - bb_sub[0]
+    sub_h = bb_sub[3] - bb_sub[1]
+
+    pad = max(12, font_size_px // 5)
+    badge_w = max(text_w, sub_w) + pad * 2
+    badge_h = text_h + (sub_h + pad // 2 if sub_text else 0) + pad * 2
+
+    bx = x + (w - badge_w) // 2
+    by = y + (h - badge_h) // 2
+
+    if shape == "rectangle":
+        draw_obj.rectangle([bx, by, bx+badge_w, by+badge_h], fill=badge_color, outline=border_color, width=3)
+    elif shape == "rounded_rect":
+        draw_obj.rounded_rectangle([bx, by, bx+badge_w, by+badge_h], radius=badge_h//4,
+                                fill=badge_color, outline=border_color, width=3)
+    elif shape == "ellipse":
+        draw_obj.ellipse([bx, by, bx+badge_w, by+badge_h], fill=badge_color, outline=border_color, width=3)
+    elif shape == "banner":
+        pts = [(bx, by + badge_h//4), (bx + badge_w//6, by),
+               (bx + badge_w*5//6, by), (bx+badge_w, by + badge_h//4),
+               (bx+badge_w, by + badge_h*3//4), (bx + badge_w*5//6, by+badge_h),
+               (bx + badge_w//6, by+badge_h), (bx, by + badge_h*3//4)]
+        draw_obj.polygon(pts, fill=badge_color, outline=border_color)
+    elif shape == "diamond":
+        mid_x, mid_y = bx + badge_w//2, by + badge_h//2
+        draw_obj.polygon([(mid_x, by), (bx+badge_w, mid_y), (mid_x, by+badge_h), (bx, mid_y)],
+                    fill=badge_color, outline=border_color)
+    elif shape == "star_badge":
+        draw_obj.rounded_rectangle([bx, by, bx+badge_w, by+badge_h], radius=8,
+                                fill=badge_color, outline=border_color, width=3)
+        notch = badge_h // 6
+        draw_obj.rectangle([bx - notch, by + badge_h//2 - notch//2,
+                         bx + notch, by + badge_h//2 + notch//2], fill=badge_color)
+        draw_obj.rectangle([bx + badge_w - notch, by + badge_h//2 - notch//2,
+                         bx + badge_w + notch, by + badge_h//2 + notch//2], fill=badge_color)
+
+    tx = x + (w - text_w) // 2
+    ty = by + pad
+    draw_obj.text((tx, ty), text, fill=text_color, font=font_main)
+
+    if sub_text:
+        sx = x + (w - sub_w) // 2
+        sy = ty + text_h + pad // 2
+        draw_obj.text((sx, sy), sub_text, fill=border_color, font=font_sub_f)
+
+
 def build_studio_sheet(photo: Image.Image, tpl: dict, filter_key: str,
                         studio_name: str = "Photo Booth Studio",
-                        studio_sub: str = "NEW WAVE PHOTO STUDIO") -> Image.Image:
-    """Build oh!shoot-style studio print with logo text top & bottom."""
+                        studio_sub: str = "NEW WAVE PHOTO STUDIO",
+                        logo_font: str = "Bold (Default)",
+                        logo_shape: str = "none",
+                        logo_text_color: tuple = (180, 40, 40),
+                        logo_badge_color: tuple = (255, 255, 255),
+                        logo_border_color: tuple = (200, 200, 200)) -> Image.Image:
+    """Build oh!shoot-style studio print with customizable logo top & bottom."""
     cols, rows = tpl["cols"], tpl["rows"]
     photo_w_px = cm_to_px(tpl["w"])
     photo_h_px = cm_to_px(tpl["h"])
@@ -606,21 +970,16 @@ def build_studio_sheet(photo: Image.Image, tpl: dict, filter_key: str,
     draw  = ImageDraw.Draw(sheet)
 
     # ── Top logo area ──────────────────────────────────────────────────────────
-    top_text_y = logo_top_h // 2
-    try:
-        font_logo = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                                        int(cm_to_px(0.55)))
-        font_sub  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                                        int(cm_to_px(0.25)))
-    except Exception:
-        font_logo = ImageFont.load_default()
-        font_sub  = font_logo
-
-    # Studio name top-center
-    bbox = draw.textbbox((0, 0), studio_name, font=font_logo)
-    tw = bbox[2] - bbox[0]
-    draw.text(((sheet_w - tw) // 2, top_text_y - (bbox[3]-bbox[1])//2 - int(cm_to_px(0.1))),
-              studio_name, fill=(180, 40, 40), font=font_logo)
+    draw_logo_badge(
+        draw, studio_name, "",
+        x=0, y=0, w=sheet_w, h=logo_top_h,
+        font_key=logo_font, shape=logo_shape,
+        text_color=logo_text_color,
+        badge_color=logo_badge_color,
+        border_color=logo_border_color,
+        font_size_px=int(cm_to_px(0.55)),
+        sub_font_size_px=int(cm_to_px(0.25)),
+    )
 
     # ── Paste photo grid ──────────────────────────────────────────────────────
     grid_y_offset = logo_top_h + margin_px
@@ -628,37 +987,27 @@ def build_studio_sheet(photo: Image.Image, tpl: dict, filter_key: str,
         for c in range(cols):
             x = margin_px + c * (cell_w + gap_px)
             y = grid_y_offset + r * (cell_h + gap_px)
-            # Thin border around each photo
             border_col = (220, 220, 220)
-            bp = 3  # border px
+            bp = 3
             draw.rectangle([x-bp, y-bp, x+cell_w+bp, y+cell_h+bp], outline=border_col, width=bp)
             sheet.paste(cell, (x, y))
 
     # ── Bottom logo area ──────────────────────────────────────────────────────
     bottom_y = sheet_h - logo_bottom_h
-    # Divider line
-    draw.line([(margin_px, bottom_y + int(cm_to_px(0.15))),
-               (sheet_w - margin_px, bottom_y + int(cm_to_px(0.15)))],
+    draw.line([(margin_px, bottom_y + int(cm_to_px(0.12))),
+               (sheet_w - margin_px, bottom_y + int(cm_to_px(0.12)))],
               fill=(220, 220, 220), width=2)
 
-    # Big studio name bottom-center
-    try:
-        font_big = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                                       int(cm_to_px(0.7)))
-    except Exception:
-        font_big = ImageFont.load_default()
-
-    bbox_big = draw.textbbox((0, 0), studio_name, font=font_big)
-    bw = bbox_big[2] - bbox_big[0]
-    bh = bbox_big[3] - bbox_big[1]
-    name_y = bottom_y + int(cm_to_px(0.35))
-    draw.text(((sheet_w - bw) // 2, name_y), studio_name, fill=(180, 40, 40), font=font_big)
-
-    # Subtitle
-    bbox_sub = draw.textbbox((0, 0), studio_sub, font=font_sub)
-    sw2 = bbox_sub[2] - bbox_sub[0]
-    draw.text(((sheet_w - sw2) // 2, name_y + bh + int(cm_to_px(0.08))),
-              studio_sub, fill=(160, 160, 160), font=font_sub)
+    draw_logo_badge(
+        draw, studio_name, studio_sub,
+        x=0, y=bottom_y, w=sheet_w, h=logo_bottom_h,
+        font_key=logo_font, shape=logo_shape,
+        text_color=logo_text_color,
+        badge_color=logo_badge_color,
+        border_color=logo_border_color,
+        font_size_px=int(cm_to_px(0.65)),
+        sub_font_size_px=int(cm_to_px(0.26)),
+    )
 
     return sheet
 
@@ -707,6 +1056,28 @@ def sheet_to_bytes(sheet: Image.Image, fmt="JPEG") -> bytes:
     else:
         sheet.save(buf, format="PNG", dpi=(DPI, DPI))
     return buf.getvalue()
+
+def add_watermark(sheet: Image.Image, name: str) -> Image.Image:
+    """Subtle watermark at bottom-right corner."""
+    if not name.strip():
+        return sheet
+    sheet = sheet.copy()
+    draw = ImageDraw.Draw(sheet)
+    w, h = sheet.size
+    try:
+        fs = max(18, int(w * 0.028))
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs)
+    except Exception:
+        font = ImageFont.load_default()
+    text = f"📸 {name}"
+    bbox = draw.textbbox((0,0), text, font=font)
+    tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
+    mg = int(w * 0.015)
+    x, y = w - tw - mg, h - th - mg
+    draw.text((x+2, y+2), text, fill=(0,0,0), font=font)
+    draw.text((x, y), text, fill=(255,255,255), font=font)
+    return sheet
+
 
 def sheet_to_pdf(sheet: Image.Image, tpl: dict) -> bytes:
     img_bytes = sheet_to_bytes(sheet, "JPEG")
@@ -1085,12 +1456,24 @@ if "studio_name" not in st.session_state:
     st.session_state.studio_name = "oh! shoot"
 if "studio_sub" not in st.session_state:
     st.session_state.studio_sub = "NEW WAVE PHOTO STUDIO"
+if "watermark_name" not in st.session_state:
+    st.session_state.watermark_name = ""
+if "logo_font" not in st.session_state:
+    st.session_state.logo_font = "Bold (Default)"
+if "logo_shape" not in st.session_state:
+    st.session_state.logo_shape = "none"
+if "logo_text_color_hex" not in st.session_state:
+    st.session_state.logo_text_color_hex = "#b42828"
+if "logo_badge_color_hex" not in st.session_state:
+    st.session_state.logo_badge_color_hex = "#ffffff"
+if "logo_border_color_hex" not in st.session_state:
+    st.session_state.logo_border_color_hex = "#cccccc"
 
 # ── UI ─────────────────────────────────────────────────────────────────────────
 st.markdown("# 📸 Photo Booth Cetak")
 st.divider()
 
-tab_photobooth, tab_collage = st.tabs(["📸 Photo Booth", "🖼️ Collage"])
+tab_photobooth, tab_collage, tab_support = st.tabs(["📸 Photo Booth", "🖼️ Collage", "💌 Dukung Developer"])
 
 with tab_photobooth:
  st.markdown("*Ambil foto → Pilih tema → Pilih template → Download PDF / JPG*")
@@ -1203,6 +1586,16 @@ with col_left:
         """, unsafe_allow_html=True)
 
     st.divider()
+    st.markdown("### 🏷️ Nama Watermark")
+    wm = st.text_input(
+        "Nama watermark di foto (kosongkan jika tidak mau)",
+        value=st.session_state.watermark_name,
+        key="wm_input", max_chars=30,
+        placeholder="contoh: Zizah Studio ✨",
+    )
+    st.session_state.watermark_name = wm
+
+    st.divider()
     st.markdown("### 3. Pilih Template" if st.session_state.photo else "### 2. Pilih Template")
 
     tpl_keys = list(TEMPLATES.keys())
@@ -1243,15 +1636,33 @@ with col_right:
 
     if st.session_state.photo is None:
         st.markdown("""
-        <div style="background:#1a1a1a; border:2px dashed #444; border-radius:12px;
-                    height:340px; display:flex; align-items:center; justify-content:center;
-                    color:#666; font-size:16px; text-align:center; padding:20px;">
-            📷<br><br>Belum ada foto.<br>Ambil atau upload foto dulu di panel kiri.
+        <div style="background:linear-gradient(135deg,#1a1a1a 0%,#222 100%);
+                    border:2px dashed #444; border-radius:16px;
+                    height:360px; display:flex; flex-direction:column;
+                    align-items:center; justify-content:center;
+                    color:#666; font-size:15px; text-align:center; padding:24px;
+                    gap:12px;">
+            <div style="font-size:52px; filter:grayscale(1) opacity(0.4);">📸</div>
+            <div style="color:#f5c518; font-size:20px; font-weight:700;
+                        font-family:'Courier New',monospace; letter-spacing:2px;">
+                SIAP UNTUK FOTO?
+            </div>
+            <div style="color:#888; font-size:13px; line-height:1.7;">
+                1. Pilih <b style="color:#aaa;">📷 Webcam</b> untuk ambil foto langsung<br>
+                2. Atau <b style="color:#aaa;">📁 Upload File</b> dari galeri kamu<br>
+                3. Foto langsung otomatis tersimpan & bisa diedit 🎨
+            </div>
+            <div style="margin-top:8px; background:#f5c518; color:#000;
+                        padding:6px 18px; border-radius:20px; font-size:12px;
+                        font-weight:700; letter-spacing:1px;">
+                ← PANEL KIRI
+            </div>
         </div>
         """, unsafe_allow_html=True)
     else:
-        # Studio name inputs (only show for studio_print)
+        # ── Studio Print / Logo custom inputs ─────────────────────────────────
         if tpl_key == "studio_print":
+            st.markdown("#### 🏷️ Kustomisasi Logo Studio")
             scol1, scol2 = st.columns(2)
             with scol1:
                 sn = st.text_input("🏪 Nama Studio", value=st.session_state.studio_name,
@@ -1262,14 +1673,51 @@ with col_right:
                                    key="studio_sub_input", max_chars=40)
                 st.session_state.studio_sub = ss
 
+            logo_col1, logo_col2, logo_col3 = st.columns(3)
+            with logo_col1:
+                lf = st.selectbox("🔤 Font Logo", list(LOGO_FONTS.keys()),
+                                  index=list(LOGO_FONTS.keys()).index(st.session_state.logo_font),
+                                  key="logo_font_sel")
+                st.session_state.logo_font = lf
+            with logo_col2:
+                ls = st.selectbox("🔷 Bentuk Badge", list(LOGO_SHAPES.values()),
+                                  key="logo_shape_sel")
+                st.session_state.logo_shape = list(LOGO_SHAPES.keys())[list(LOGO_SHAPES.values()).index(ls)]
+            with logo_col3:
+                st.markdown("**Warna Teks**")
+                ltc = st.color_picker("Warna Teks Logo", value=st.session_state.logo_text_color_hex,
+                                      key="logo_text_color", label_visibility="collapsed")
+                st.session_state.logo_text_color_hex = ltc
+
+            bdc_col1, bdc_col2 = st.columns(2)
+            with bdc_col1:
+                st.markdown("**Warna Badge**")
+                lbc = st.color_picker("Warna Badge", value=st.session_state.logo_badge_color_hex,
+                                      key="logo_badge_color", label_visibility="collapsed")
+                st.session_state.logo_badge_color_hex = lbc
+            with bdc_col2:
+                st.markdown("**Warna Border Badge**")
+                lbrc = st.color_picker("Warna Border", value=st.session_state.logo_border_color_hex,
+                                       key="logo_border_color", label_visibility="collapsed")
+                st.session_state.logo_border_color_hex = lbrc
+
+        def _hex_to_rgb(h):
+            h = h.lstrip("#")
+            return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
         with st.spinner("⚙️ Membuat layout..."):
             if tpl_key == "studio_print":
                 sheet = build_studio_sheet(
                     st.session_state.photo, tpl, current_filter,
                     st.session_state.studio_name,
                     st.session_state.studio_sub,
+                    logo_font=st.session_state.logo_font,
+                    logo_shape=st.session_state.logo_shape,
+                    logo_text_color=_hex_to_rgb(st.session_state.logo_text_color_hex),
+                    logo_badge_color=_hex_to_rgb(st.session_state.logo_badge_color_hex),
+                    logo_border_color=_hex_to_rgb(st.session_state.logo_border_color_hex),
                 )
-            elif tpl["style"].startswith("frame_"):
+            elif tpl["style"].startswith("frame_") or tpl["style"].startswith("romance_"):
                 sheet = build_frame_sheet(st.session_state.photo, tpl, current_filter)
             else:
                 sheet = build_sheet(st.session_state.photo, tpl, current_filter)
@@ -1282,8 +1730,14 @@ with col_right:
             if tpl_key == "studio_print":
                 sheet_before = build_studio_sheet(
                     st.session_state.photo, tpl, "normal",
-                    st.session_state.studio_name, st.session_state.studio_sub)
-            elif tpl["style"].startswith("frame_"):
+                    st.session_state.studio_name, st.session_state.studio_sub,
+                    logo_font=st.session_state.logo_font,
+                    logo_shape=st.session_state.logo_shape,
+                    logo_text_color=_hex_to_rgb(st.session_state.logo_text_color_hex),
+                    logo_badge_color=_hex_to_rgb(st.session_state.logo_badge_color_hex),
+                    logo_border_color=_hex_to_rgb(st.session_state.logo_border_color_hex),
+                )
+            elif tpl["style"].startswith("frame_") or tpl["style"].startswith("romance_"):
                 sheet_before = build_frame_sheet(st.session_state.photo, tpl, "normal")
             else:
                 sheet_before = build_sheet(st.session_state.photo, tpl, "normal")
@@ -1304,8 +1758,10 @@ with col_right:
 
         d1, d2 = st.columns(2)
 
+        sheet_wm = add_watermark(sheet, st.session_state.watermark_name)
+
         with d1:
-            jpg_bytes = sheet_to_bytes(sheet, "JPEG")
+            jpg_bytes = sheet_to_bytes(sheet_wm, "JPEG")
             st.download_button(
                 label="⬇️ Download JPG",
                 data=jpg_bytes,
@@ -1315,7 +1771,7 @@ with col_right:
             )
 
         with d2:
-            pdf_bytes = sheet_to_pdf(sheet, tpl)
+            pdf_bytes = sheet_to_pdf(sheet_wm, tpl)
             st.download_button(
                 label="⬇️ Download PDF",
                 data=pdf_bytes,
@@ -1584,6 +2040,145 @@ with tab_collage:
                         mime="application/pdf",
                         use_container_width=True,
                     )
+
+
+
+with tab_support:
+    API_URL = "https://photobooth-api.up.railway.app"  # ganti dengan URL Railway kamu
+
+    st.markdown("""
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Spectral:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+    <style>
+    .support-wrap {
+        max-width:620px; margin:0 auto; padding:8px 0;
+    }
+    .support-card {
+        background:#1a0f0f;
+        border:2px dashed #c8a040;
+        border-radius:14px;
+        padding:28px 24px 32px;
+        box-shadow:0 0 24px rgba(200,160,64,0.18), inset 0 0 30px rgba(0,0,0,0.3);
+        margin-bottom:20px;
+    }
+    .support-title {
+        font-family:'Cinzel',serif;
+        font-size:clamp(16px,4vw,22px);
+        color:#c8a040;
+        text-align:center;
+        letter-spacing:2px;
+        margin-bottom:6px;
+        text-shadow:0 0 14px rgba(200,160,64,0.4);
+    }
+    .support-sub {
+        font-family:'Spectral',Georgia,serif;
+        font-size:14px;
+        color:#c8b89a;
+        text-align:center;
+        margin-bottom:18px;
+        line-height:1.6;
+    }
+    .doa-count {
+        background:#2a1a0a;
+        border:1px solid #c8a040;
+        border-radius:8px;
+        padding:10px 16px;
+        text-align:center;
+        font-family:'Cinzel',serif;
+        color:#c8a040;
+        font-size:13px;
+        margin-bottom:18px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="support-wrap">', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="support-card">
+        <div class="support-title">💌 Pesan & Doa untuk Developer</div>
+        <div class="support-sub">
+            Aplikasi ini dibuat dengan sepenuh hati.<br>
+            Tidak ada yang diminta selain doa & pesan baikmu. 🙏
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Hitung doa
+    try:
+        import requests as req_lib
+        r = req_lib.get(f"{API_URL}/doa/count", timeout=3)
+        total = r.json().get("total", 0)
+        st.markdown(f'<div class="doa-count">🌟 {total} orang sudah mengirim doa & pesan</div>',
+                    unsafe_allow_html=True)
+    except Exception:
+        st.markdown('<div class="doa-count">🌟 Jadilah yang pertama mengirim doa ✨</div>',
+                    unsafe_allow_html=True)
+
+    with st.form("form_doa", clear_on_submit=True):
+        nama = st.text_input("Nama kamu (boleh anonim)", placeholder="contoh: Zizah 💕",
+                             max_chars=40)
+        pesan = st.text_area("Pesan & saran untuk developer 💬",
+                             placeholder="Tulis pesanmu di sini...",
+                             max_chars=500, height=120)
+        doa = st.text_area("Doa untuk developer 🙏 (opsional)",
+                           placeholder="contoh: Semoga rezekinya lancar, segera ke Jakarta...",
+                           max_chars=300, height=80)
+
+        # Detect device via JS
+        components.html("""
+        <script>
+        const ua = navigator.userAgent;
+        const el = window.parent.document.querySelector('input[aria-label="device_info_hidden"]');
+        if (el) { el.value = ua; el.dispatchEvent(new Event('input',{bubbles:true})); }
+        </script>
+        """, height=0)
+        device_info = st.text_input("device_info_hidden", key="device_info",
+                                    label_visibility="collapsed")
+
+        submitted = st.form_submit_button("💌 Kirim Pesan & Doa", use_container_width=True)
+
+        if submitted:
+            if not pesan.strip():
+                st.warning("Tulis pesan dulu ya 😊")
+            else:
+                try:
+                    import requests as req_lib
+                    payload = {
+                        "nama":   nama.strip() or "Anonim",
+                        "pesan":  pesan.strip(),
+                        "doa":    doa.strip(),
+                        "device": device_info[:200] if device_info else "",
+                    }
+                    r = req_lib.post(f"{API_URL}/doa", json=payload, timeout=5)
+                    data = r.json()
+                    if data.get("status") == "ok":
+                        st.success(f"✅ {data['pesan']}")
+                        st.info(f"📍 Terdeteksi dari: **{data.get('lokasi','?')}**")
+                        st.balloons()
+                    else:
+                        st.error("Gagal mengirim, coba lagi 😢")
+                except Exception as ex:
+                    st.error(f"Koneksi ke server gagal: {ex}")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Info developer
+    st.divider()
+    st.markdown("""
+    <div style="text-align:center; padding:16px; background:#1a0f0f;
+                border-radius:12px; border:1px solid #333; max-width:620px; margin:0 auto;">
+        <div style="font-family:'Cinzel',serif; color:#c8a040; font-size:14px;
+                    letter-spacing:1.5px; margin-bottom:8px;">TENTANG DEVELOPER</div>
+        <div style="font-family:'Spectral',Georgia,serif; color:#c8b89a;
+                    font-size:13px; line-height:1.8;">
+            Dibuat oleh <b style="color:#c8a040;">Isfan Fajar Anugrah</b><br>
+            IT Support · Python Developer · Serang, Banten<br>
+            <span style="font-size:12px; color:#888;">
+            Aplikasi ini dibuat dengan cinta dan kopi ☕<br>
+            semoga bermanfaat untuk kamu 💛
+            </span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
