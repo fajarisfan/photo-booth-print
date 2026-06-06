@@ -1057,26 +1057,85 @@ def sheet_to_bytes(sheet: Image.Image, fmt="JPEG") -> bytes:
         sheet.save(buf, format="PNG", dpi=(DPI, DPI))
     return buf.getvalue()
 
-def add_watermark(sheet: Image.Image, name: str) -> Image.Image:
-    """Subtle watermark at bottom-right corner."""
-    if not name.strip():
+WATERMARK_POSITIONS = {
+    "Kanan Bawah": "bottom_right",
+    "Kiri Bawah":  "bottom_left",
+    "Kanan Atas":  "top_right",
+    "Kiri Atas":   "top_left",
+    "Tengah":      "center",
+}
+
+def add_watermark(sheet: Image.Image, name: str,
+                  logo_img=None,
+                  position: str = "bottom_right",
+                  logo_size_pct: int = 12,
+                  opacity: int = 200) -> Image.Image:
+    """Watermark dengan teks dan/atau logo gambar di posisi pilihan."""
+    has_text = bool(name and name.strip())
+    has_logo = logo_img is not None
+    if not has_text and not has_logo:
         return sheet
-    sheet = sheet.copy()
-    draw = ImageDraw.Draw(sheet)
+
+    sheet = sheet.copy().convert("RGBA")
     w, h = sheet.size
-    try:
-        fs = max(18, int(w * 0.028))
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs)
-    except Exception:
-        font = ImageFont.load_default()
-    text = f"📸 {name}"
-    bbox = draw.textbbox((0,0), text, font=font)
-    tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
-    mg = int(w * 0.015)
-    x, y = w - tw - mg, h - th - mg
-    draw.text((x+2, y+2), text, fill=(0,0,0), font=font)
-    draw.text((x, y), text, fill=(255,255,255), font=font)
-    return sheet
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    mg = int(w * 0.018)
+
+    logo_px = int(w * logo_size_pct / 100) if has_logo else 0
+    logo_resized = None
+    if has_logo:
+        lw, lh = logo_img.size
+        scale = logo_px / max(lw, lh)
+        logo_resized = logo_img.resize(
+            (int(lw * scale), int(lh * scale)), Image.LANCZOS
+        ).convert("RGBA")
+        r, g, b, a = logo_resized.split()
+        a = a.point(lambda v: int(v * opacity / 255))
+        logo_resized = Image.merge("RGBA", (r, g, b, a))
+
+    text_w, text_h = 0, 0
+    font = None
+    if has_text:
+        try:
+            fs = max(18, int(w * 0.026))
+            font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs)
+        except Exception:
+            font = ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), name, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+
+    gap = int(w * 0.008)
+    total_w = (logo_resized.size[0] if logo_resized else 0) + (gap if has_logo and has_text else 0) + text_w
+    total_h = max(logo_resized.size[1] if logo_resized else 0, text_h)
+
+    if position == "bottom_right":
+        ax, ay = w - total_w - mg, h - total_h - mg
+    elif position == "bottom_left":
+        ax, ay = mg, h - total_h - mg
+    elif position == "top_right":
+        ax, ay = w - total_w - mg, mg
+    elif position == "top_left":
+        ax, ay = mg, mg
+    else:
+        ax, ay = (w - total_w) // 2, (h - total_h) // 2
+
+    cur_x = ax
+    if logo_resized:
+        lw2, lh2 = logo_resized.size
+        ly = ay + (total_h - lh2) // 2
+        overlay.paste(logo_resized, (cur_x, ly), logo_resized)
+        cur_x += lw2 + gap
+
+    if has_text and font:
+        ty = ay + (total_h - text_h) // 2
+        draw.text((cur_x + 2, ty + 2), name, fill=(0, 0, 0, 160), font=font)
+        draw.text((cur_x, ty), name, fill=(255, 255, 255, opacity), font=font)
+
+    sheet = Image.alpha_composite(sheet, overlay)
+    return sheet.convert("RGB")
 
 
 def sheet_to_pdf(sheet: Image.Image, tpl: dict) -> bytes:
@@ -1185,10 +1244,10 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
   justify-content:center; align-items:center;
 }
 #captureBtn {
-  background:#f5c518; color:#000; border:none; border-radius:50%;
-  width:64px; height:64px; font-size:26px; cursor:pointer; font-weight:bold;
+  background:#f5c518; color:#000; border:none; border-radius:12px;
+  width:auto; padding:0 22px; height:56px; font-size:16px; cursor:pointer; font-weight:bold;
   box-shadow:0 0 0 4px #333; transition:transform 0.1s;
-  flex-shrink:0;
+  flex-shrink:0; letter-spacing:1px;
 }
 #captureBtn:active { transform:scale(0.88); }
 .tbtn {
@@ -1225,10 +1284,13 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 </div>
 
 <div id="motionBar"><div id="motionFill"></div></div>
+<div id="motionLabel" style="text-align:center;font-size:11px;color:#666;margin:2px 0 6px;">
+  Motion detector — gerak = auto snap
+</div>
 
 <div id="controls">
   <button class="tbtn on" id="autoBtn" onclick="toggleAuto()">🤏 Auto Snap</button>
-  <button id="captureBtn" onclick="startCapture()">📸</button>
+  <button id="captureBtn" onclick="startCapture()">📸 AMBIL FOTO</button>
   <button class="tbtn" id="timerBtn" onclick="toggleTimer()">⏱️ Timer 3s</button>
 </div>
 <div id="status">Memulai kamera...</div>
@@ -1458,6 +1520,14 @@ if "studio_sub" not in st.session_state:
     st.session_state.studio_sub = "NEW WAVE PHOTO STUDIO"
 if "watermark_name" not in st.session_state:
     st.session_state.watermark_name = ""
+if "watermark_logo" not in st.session_state:
+    st.session_state.watermark_logo = None
+if "watermark_position" not in st.session_state:
+    st.session_state.watermark_position = "Kanan Bawah"
+if "watermark_logo_size" not in st.session_state:
+    st.session_state.watermark_logo_size = 12
+if "watermark_opacity" not in st.session_state:
+    st.session_state.watermark_opacity = 200
 if "logo_font" not in st.session_state:
     st.session_state.logo_font = "Bold (Default)"
 if "logo_shape" not in st.session_state:
@@ -1586,14 +1656,52 @@ with col_left:
         """, unsafe_allow_html=True)
 
     st.divider()
-    st.markdown("### 🏷️ Nama Watermark")
-    wm = st.text_input(
-        "Nama watermark di foto (kosongkan jika tidak mau)",
-        value=st.session_state.watermark_name,
-        key="wm_input", max_chars=30,
-        placeholder="contoh: Zizah Studio ✨",
+    st.markdown("### 🏷️ Watermark & Logo")
+
+    wm_col1, wm_col2 = st.columns([1, 1])
+    with wm_col1:
+        wm = st.text_input(
+            "Teks watermark (opsional)",
+            value=st.session_state.watermark_name,
+            key="wm_input", max_chars=30,
+            placeholder="contoh: Zizah Studio",
+        )
+        st.session_state.watermark_name = wm
+    with wm_col2:
+        wm_pos = st.selectbox(
+            "Posisi",
+            list(WATERMARK_POSITIONS.keys()),
+            index=list(WATERMARK_POSITIONS.keys()).index(st.session_state.watermark_position),
+            key="wm_pos_sel",
+        )
+        st.session_state.watermark_position = wm_pos
+
+    wm_logo_file = st.file_uploader(
+        "Upload Logo (PNG transparan lebih bagus)",
+        type=["png", "jpg", "jpeg", "webp"],
+        key="wm_logo_upload",
     )
-    st.session_state.watermark_name = wm
+    if wm_logo_file:
+        st.session_state.watermark_logo = Image.open(wm_logo_file).convert("RGBA")
+        st.success("✅ Logo terupload!")
+
+    if st.session_state.watermark_logo is not None:
+        wm_preview_col, wm_ctrl_col = st.columns([1, 2])
+        with wm_preview_col:
+            st.image(st.session_state.watermark_logo, width=80, caption="Logo preview")
+        with wm_ctrl_col:
+            lsz = st.slider("Ukuran logo (%)", 5, 30,
+                            st.session_state.watermark_logo_size, key="wm_logo_size")
+            st.session_state.watermark_logo_size = lsz
+            opac = st.slider("Opacity (0=transparan, 255=solid)",
+                             50, 255, st.session_state.watermark_opacity, key="wm_opacity")
+            st.session_state.watermark_opacity = opac
+        if st.button("🗑️ Hapus Logo", key="wm_logo_del"):
+            st.session_state.watermark_logo = None
+            st.rerun()
+    else:
+        lsz = st.session_state.watermark_logo_size
+        opac = st.session_state.watermark_opacity
 
     st.divider()
     st.markdown("### 3. Pilih Template" if st.session_state.photo else "### 2. Pilih Template")
@@ -1758,7 +1866,14 @@ with col_right:
 
         d1, d2 = st.columns(2)
 
-        sheet_wm = add_watermark(sheet, st.session_state.watermark_name)
+        sheet_wm = add_watermark(
+            sheet,
+            st.session_state.watermark_name,
+            logo_img=st.session_state.watermark_logo,
+            position=WATERMARK_POSITIONS.get(st.session_state.watermark_position, "bottom_right"),
+            logo_size_pct=st.session_state.watermark_logo_size,
+            opacity=st.session_state.watermark_opacity,
+        )
 
         with d1:
             jpg_bytes = sheet_to_bytes(sheet_wm, "JPEG")
