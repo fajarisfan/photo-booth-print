@@ -163,6 +163,56 @@ TEMPLATES = {
         "border": 6,
         "style": "studio",
     },
+    "frame_classic": {
+        "name": "Classic Polaroid",
+        "w": 8.0, "h": 9.5,
+        "cols": 1, "rows": 1,
+        "desc": "1 foto\nFrame polaroid putih klasik",
+        "icon": "🟦",
+        "bg_color": (255, 255, 255),
+        "border": 0,
+        "style": "frame_classic",
+    },
+    "frame_strip3": {
+        "name": "Strip Frame 3",
+        "w": 6.5, "h": 5.0,
+        "cols": 1, "rows": 3,
+        "desc": "1×3 strip\nFrame putih soft polaroid",
+        "icon": "🎞️",
+        "bg_color": (255, 255, 255),
+        "border": 0,
+        "style": "frame_strip3",
+    },
+    "frame_grid4": {
+        "name": "Grid Frame 2×2",
+        "w": 7.0, "h": 7.0,
+        "cols": 2, "rows": 2,
+        "desc": "2×2 grid\nFrame putih aesthetic",
+        "icon": "⊞",
+        "bg_color": (255, 255, 255),
+        "border": 0,
+        "style": "frame_grid4",
+    },
+    "frame_pink": {
+        "name": "Pink Girly",
+        "w": 8.0, "h": 9.5,
+        "cols": 1, "rows": 1,
+        "desc": "1 foto\nFrame pink pastel cute",
+        "icon": "🌸",
+        "bg_color": (255, 220, 230),
+        "border": 0,
+        "style": "frame_pink",
+    },
+    "frame_dark": {
+        "name": "Dark Aesthetic",
+        "w": 8.0, "h": 9.5,
+        "cols": 1, "rows": 1,
+        "desc": "1 foto\nFrame hitam moody",
+        "icon": "🖤",
+        "bg_color": (20, 20, 20),
+        "border": 0,
+        "style": "frame_dark",
+    },
 }
 
 # ── Photo Filter / Tema definitions ───────────────────────────────────────────
@@ -399,6 +449,136 @@ def add_polaroid_frame(img: Image.Image, border_px: int, tpl: dict) -> Image.Ima
 
     else:
         return img
+
+def build_frame_sheet(photo: Image.Image, tpl: dict, filter_key: str) -> Image.Image:
+    """Build polaroidbooth-style framed print with decorative borders."""
+    style = tpl["style"]
+    bg    = tpl["bg_color"]
+    DPI_  = 300
+    CM_   = DPI_ / 2.54
+
+    def cm(v): return int(v * CM_)
+
+    filtered = apply_filter(photo, filter_key)
+
+    if style == "frame_classic":
+        # White polaroid: thick bottom border, thin sides/top
+        pw, ph = cm(tpl["w"]), cm(tpl["h"])
+        pad_side   = cm(0.6)
+        pad_top    = cm(0.6)
+        pad_bottom = cm(1.8)  # classic polaroid thick bottom
+        inner_w = pw - pad_side * 2
+        inner_h = ph - pad_top - pad_bottom
+        cell = fit_crop(filtered, inner_w, inner_h)
+        sheet = Image.new("RGB", (pw, ph), bg)
+        sheet.paste(cell, (pad_side, pad_top))
+        return sheet
+
+    elif style == "frame_strip3":
+        # 3 vertical strips with white frame each
+        cols, rows = 1, 3
+        pw = cm(tpl["w"])
+        pad_side   = cm(0.5)
+        pad_top    = cm(0.4)
+        pad_bottom = cm(1.2)
+        gap        = cm(0.35)
+        cell_w = pw - pad_side * 2
+        total_cell_h = cm(tpl["h"]) * rows
+        sheet_h = pad_top + rows * (total_cell_h // rows) + gap * (rows - 1) * 2 + pad_bottom + cm(0.5)
+        cell_h = (sheet_h - pad_top - pad_bottom - gap * (rows - 1)) // rows
+        sheet = Image.new("RGB", (pw, sheet_h), bg)
+        draw = ImageDraw.Draw(sheet)
+        for i in range(rows):
+            y = pad_top + i * (cell_h + gap)
+            cell = fit_crop(filtered, cell_w, cell_h)
+            # Thin shadow border
+            draw.rectangle([pad_side-2, y-2, pad_side+cell_w+2, y+cell_h+2],
+                           outline=(200,200,200), width=1)
+            sheet.paste(cell, (pad_side, y))
+        return sheet
+
+    elif style == "frame_grid4":
+        # 2x2 grid with white frame
+        pw, ph = cm(tpl["w"] * 1.2), cm(tpl["h"] * 1.2)
+        pad    = cm(0.55)
+        gap    = cm(0.3)
+        cell_w = (pw - pad * 2 - gap) // 2
+        cell_h = (ph - pad * 2 - gap) // 2
+        sheet = Image.new("RGB", (pw, ph), bg)
+        draw = ImageDraw.Draw(sheet)
+        for r in range(2):
+            for c in range(2):
+                x = pad + c * (cell_w + gap)
+                y = pad + r * (cell_h + gap)
+                cell = fit_crop(filtered, cell_w, cell_h)
+                draw.rectangle([x-2, y-2, x+cell_w+2, y+cell_h+2],
+                               outline=(210,210,210), width=1)
+                sheet.paste(cell, (x, y))
+        return sheet
+
+    elif style == "frame_pink":
+        pw, ph = cm(tpl["w"]), cm(tpl["h"])
+        pad_side   = cm(0.7)
+        pad_top    = cm(0.7)
+        pad_bottom = cm(2.2)
+        inner_w = pw - pad_side * 2
+        inner_h = ph - pad_top - pad_bottom
+        cell = fit_crop(filtered, inner_w, inner_h)
+        sheet = Image.new("RGB", (pw, ph), bg)
+        draw = ImageDraw.Draw(sheet)
+        # Decorative dots border
+        dot_col = (255, 170, 195)
+        for i in range(0, pw, cm(0.6)):
+            draw.ellipse([i-3, 3, i+3, 9], fill=dot_col)
+            draw.ellipse([i-3, ph-9, i+3, ph-3], fill=dot_col)
+        for i in range(0, ph, cm(0.6)):
+            draw.ellipse([3, i-3, 9, i+3], fill=dot_col)
+            draw.ellipse([pw-9, i-3, pw-3, i+3], fill=dot_col)
+        sheet.paste(cell, (pad_side, pad_top))
+        # Hearts deco at bottom
+        try:
+            font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", cm(0.45))
+        except Exception:
+            font = ImageFont.load_default()
+        hearts = "♥  ♥  ♥  ♥  ♥"
+        bbox = draw.textbbox((0,0), hearts, font=font)
+        tx = (pw - (bbox[2]-bbox[0])) // 2
+        ty = ph - pad_bottom // 2 - (bbox[3]-bbox[1]) // 2
+        draw.text((tx, ty), hearts, fill=(220, 100, 140), font=font)
+        return sheet
+
+    elif style == "frame_dark":
+        pw, ph = cm(tpl["w"]), cm(tpl["h"])
+        pad_side   = cm(0.6)
+        pad_top    = cm(0.6)
+        pad_bottom = cm(1.8)
+        inner_w = pw - pad_side * 2
+        inner_h = ph - pad_top - pad_bottom
+        cell = fit_crop(filtered, inner_w, inner_h)
+        sheet = Image.new("RGB", (pw, ph), bg)
+        draw = ImageDraw.Draw(sheet)
+        # Gold thin border
+        draw.rectangle([pad_side-4, pad_top-4,
+                         pad_side+inner_w+4, pad_top+inner_h+4],
+                        outline=(180, 140, 0), width=2)
+        sheet.paste(cell, (pad_side, pad_top))
+        # Bottom text
+        try:
+            font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cm(0.32))
+        except Exception:
+            font = ImageFont.load_default()
+        label = "✦  CAPTURED  ✦"
+        bbox = draw.textbbox((0,0), label, font=font)
+        tx = (pw - (bbox[2]-bbox[0])) // 2
+        ty = ph - pad_bottom // 2 - (bbox[3]-bbox[1]) // 2
+        draw.text((tx, ty), label, fill=(180, 140, 0), font=font)
+        return sheet
+
+    # fallback
+    return build_sheet(photo, tpl, filter_key)
+
 
 def build_studio_sheet(photo: Image.Image, tpl: dict, filter_key: str,
                         studio_name: str = "Photo Booth Studio",
@@ -686,6 +866,7 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
   <p id="savedMsg">✅ Foto tersimpan otomatis!</p>
   <img id="previewImg" src="" alt="preview">
   <button id="retakeBtn" onclick="retake()">🔄 Ambil Ulang Foto</button>
+  <p style="font-size:11px;color:#666;margin-top:4px;">Foto kurang pas? Tap ambil ulang</p>
 </div>
 
 <script>
@@ -736,10 +917,11 @@ navigator.mediaDevices.getUserMedia({
 // ── Motion detection ──────────────────────────────────────────────────────────
 let prevFrame   = null;
 let motionScore = 0;
-let motionHoldFrames = 0;     // frames motion stays high
-const MOTION_THRESHOLD = 18;  // pixel diff threshold per channel
-const MOTION_TRIGGER   = 0.06; // 6% of pixels must move
-const HOLD_FRAMES      = 8;   // frames motion must persist before trigger
+let motionHoldFrames = 0;
+let snapCooldown = 0;          // prevent double-snap
+const MOTION_THRESHOLD = 10;  // lebih sensitif
+const MOTION_TRIGGER   = 0.04; // 4% pixels bergerak = cukup
+const HOLD_FRAMES      = 5;   // lebih cepat trigger
 
 const motionCanvas = document.createElement('canvas');
 const motionCtx    = motionCanvas.getContext('2d', { willReadFrequently:true });
@@ -792,9 +974,13 @@ function motionLoop() {
     motionHoldFrames = 0;
   }
 
+  // Cooldown countdown
+  if (snapCooldown > 0) snapCooldown--;
+
   // Trigger auto snap
-  if (autoSnap && motionHoldFrames >= HOLD_FRAMES && !capturing) {
+  if (autoSnap && motionHoldFrames >= HOLD_FRAMES && !capturing && snapCooldown === 0) {
     motionHoldFrames = 0;
+    snapCooldown = 60; // ~2 detik cooldown biar ga dobel snap
     startCapture();
   }
 
@@ -871,7 +1057,12 @@ function retake() {
   previewBox.style.display = 'none';
   previewMode = false;
   prevFrame   = null;
-  statusEl.textContent = '🤏 Gerakkan tangan untuk snap otomatis';
+  snapCooldown = 30; // sedikit delay setelah retake
+  motionHoldFrames = 0;
+  motionScore = 0;
+  statusEl.textContent = autoSnap
+    ? '🤏 Gerakkan tangan untuk snap otomatis'
+    : '📸 Tap tombol untuk foto';
 }
 </script>
 </body>
@@ -1078,6 +1269,8 @@ with col_right:
                     st.session_state.studio_name,
                     st.session_state.studio_sub,
                 )
+            elif tpl["style"].startswith("frame_"):
+                sheet = build_frame_sheet(st.session_state.photo, tpl, current_filter)
             else:
                 sheet = build_sheet(st.session_state.photo, tpl, current_filter)
             thumb = preview_thumbnail(sheet, max_px=700)
@@ -1090,6 +1283,8 @@ with col_right:
                 sheet_before = build_studio_sheet(
                     st.session_state.photo, tpl, "normal",
                     st.session_state.studio_name, st.session_state.studio_sub)
+            elif tpl["style"].startswith("frame_"):
+                sheet_before = build_frame_sheet(st.session_state.photo, tpl, "normal")
             else:
                 sheet_before = build_sheet(st.session_state.photo, tpl, "normal")
             thumb_before = preview_thumbnail(sheet_before, max_px=700)
