@@ -594,454 +594,284 @@ def get_ar_camera_html():
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:#111; font-family:'Courier New',monospace; color:#eee; }
-#wrap { position:relative; width:100%; max-width:520px; margin:0 auto; }
+#wrap {
+  position:relative; width:100%; max-width:520px; margin:0 auto;
+}
 #video {
   width:100%; display:block; border-radius:10px;
   transform:scaleX(-1);
 }
-#overlay {
+/* Motion indicator bar */
+#motionBar {
+  width:100%; height:6px; background:#222; border-radius:3px;
+  margin-top:6px; overflow:hidden;
+}
+#motionFill {
+  height:100%; width:0%; background:#f5c518;
+  transition:width 0.1s; border-radius:3px;
+}
+/* Countdown overlay */
+#countdownOverlay {
   position:absolute; top:0; left:0; width:100%; height:100%;
-  border-radius:10px; pointer-events:none;
+  display:flex; align-items:center; justify-content:center;
+  pointer-events:none; opacity:0;
+  border-radius:10px;
 }
-#controls {
-  display:flex; gap:6px; margin-top:8px; justify-content:center;
-  flex-wrap:wrap; align-items:center;
+#countdownNum {
+  font-size:clamp(72px,20vw,120px); font-weight:900;
+  color:#f5c518; text-shadow:0 0 30px rgba(245,197,24,0.8),0 2px 8px rgba(0,0,0,0.9);
+  font-family:'Courier New',monospace;
 }
-#captureBtn {
-  background:#f5c518; color:#000; border:none; border-radius:50%;
-  width:62px; height:62px; font-size:24px; cursor:pointer; font-weight:bold;
-  box-shadow:0 0 0 4px #333; transition:transform 0.1s, box-shadow 0.1s;
-  flex-shrink:0;
-}
-#captureBtn:active { transform:scale(0.9); box-shadow:0 0 0 2px #333; }
-.tbtn {
-  background:#1e1e1e; color:#888; border:1.5px solid #444;
-  border-radius:8px; padding:5px 9px; font-size:11px; cursor:pointer;
-  transition:all 0.15s; white-space:nowrap;
-}
-.tbtn.on { background:#1e1e0a; color:#f5c518; border-color:#f5c518; }
-#status {
-  text-align:center; color:#888; font-size:11px; margin-top:6px;
-  min-height:18px; letter-spacing:0.5px; padding:0 8px;
-}
+/* Flash */
 #flash {
   position:absolute; top:0; left:0; width:100%; height:100%;
   background:white; border-radius:10px; opacity:0; pointer-events:none;
+  transition:opacity 0.25s;
 }
-#preview-box {
+/* Controls */
+#controls {
+  display:flex; gap:8px; margin-top:8px;
+  justify-content:center; align-items:center;
+}
+#captureBtn {
+  background:#f5c518; color:#000; border:none; border-radius:50%;
+  width:64px; height:64px; font-size:26px; cursor:pointer; font-weight:bold;
+  box-shadow:0 0 0 4px #333; transition:transform 0.1s;
+  flex-shrink:0;
+}
+#captureBtn:active { transform:scale(0.88); }
+.tbtn {
+  background:#1e1e1e; color:#aaa; border:1.5px solid #444;
+  border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer;
+}
+.tbtn.on { background:#1e1e0a; color:#f5c518; border-color:#f5c518; }
+/* Status */
+#status {
+  text-align:center; font-size:12px; color:#888;
+  margin-top:5px; min-height:18px; letter-spacing:0.4px;
+}
+/* Preview */
+#previewBox {
   margin-top:10px; text-align:center; display:none;
 }
-#preview-box img {
+#previewImg {
   max-width:100%; border-radius:8px; border:2px solid #f5c518;
 }
-#preview-box p {
-  font-size:11px; color:#aaa; margin-top:4px;
+#previewBox p { font-size:11px; color:#aaa; margin:5px 0; }
+#savedMsg { font-size:13px; color:#00e676; margin:6px 0; font-weight:700; }
+#retakeBtn {
+  width:100%; background:#1e1e1e; color:#f5c518; border:1.5px solid #f5c518;
+  border-radius:8px; padding:10px; font-size:13px; font-weight:700;
+  cursor:pointer; margin-top:6px;
 }
-#sendBtn {
-  margin-top:6px; background:#f5c518; color:#000; border:none;
-  border-radius:8px; padding:8px 20px; font-size:13px;
-  font-weight:800; cursor:pointer; width:100%;
-}
-#sendBtn:hover { background:#d4a800; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <video id="video" autoplay playsinline muted></video>
-  <canvas id="overlay"></canvas>
+  <div id="countdownOverlay"><span id="countdownNum">3</span></div>
   <div id="flash"></div>
 </div>
+
+<div id="motionBar"><div id="motionFill"></div></div>
+
 <div id="controls">
-  <button class="tbtn" id="btnSkull"    onclick="tog('skull')">💀 Skull</button>
-  <button class="tbtn on" id="btnSticker" onclick="tog('sticker')">🎩 Sticker</button>
-  <button id="captureBtn" title="Ambil Foto">📸</button>
-  <button class="tbtn on" id="btnQuote"   onclick="tog('quote')">💬 Quote</button>
-  <button class="tbtn" id="btnHand"     onclick="tog('hand')">✋ Tangan</button>
+  <button class="tbtn on" id="autoBtn" onclick="toggleAuto()">🤏 Auto Snap</button>
+  <button id="captureBtn" onclick="startCapture()">📸</button>
+  <button class="tbtn" id="timerBtn" onclick="toggleTimer()">⏱️ Timer 3s</button>
 </div>
-<div id="status">Memuat model AI...</div>
+<div id="status">Memulai kamera...</div>
 
-<!-- Preview hasil capture + tombol simpan -->
-<div id="preview-box">
-  <p>📸 Hasil foto — klik Gunakan Foto untuk melanjutkan</p>
-  <img id="preview-img" src="" alt="preview"/>
-  <button id="sendBtn" onclick="sendPhoto()">✅ Gunakan Foto Ini</button>
-  <button class="tbtn" style="width:100%;margin-top:4px;" onclick="retake()">🔄 Ambil Ulang</button>
+<div id="previewBox">
+  <p id="savedMsg">✅ Foto tersimpan otomatis!</p>
+  <img id="previewImg" src="" alt="preview">
+  <button id="retakeBtn" onclick="retake()">🔄 Ambil Ulang Foto</button>
 </div>
-
-<!-- Hidden form to post base64 back to Streamlit parent -->
-<form id="photoForm" style="display:none;">
-  <textarea id="photoData"></textarea>
-</form>
-
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
 
 <script>
-const video   = document.getElementById('video');
-const canvas  = document.getElementById('overlay');
-const ctx     = canvas.getContext('2d');
-const status  = document.getElementById('status');
-const flash   = document.getElementById('flash');
-const captBtn = document.getElementById('captureBtn');
-const previewBox = document.getElementById('preview-box');
-const previewImg = document.getElementById('preview-img');
+const video     = document.getElementById('video');
+const flash     = document.getElementById('flash');
+const motionFill= document.getElementById('motionFill');
+const cdOverlay = document.getElementById('countdownOverlay');
+const cdNum     = document.getElementById('countdownNum');
+const statusEl  = document.getElementById('status');
+const previewBox= document.getElementById('previewBox');
+const previewImg= document.getElementById('previewImg');
 
-const feat = { skull:false, sticker:true, quote:true, hand:false };
-let capturedDataUrl = null;
-let isPreviewMode = false;
+let autoSnap   = true;   // auto snap on motion
+let timerMode  = false;  // manual 3s timer before snap
+let capturing  = false;  // countdown in progress
+let previewMode= false;
+let capturedUrl= null;
 
-function tog(f) {
-  feat[f] = !feat[f];
-  document.getElementById('btn'+f.charAt(0).toUpperCase()+f.slice(1))
-    .classList.toggle('on', feat[f]);
+// ── Toggle buttons ────────────────────────────────────────────────────────────
+function toggleAuto() {
+  autoSnap = !autoSnap;
+  document.getElementById('autoBtn').classList.toggle('on', autoSnap);
+  if (!autoSnap) { motionFill.style.width = '0%'; }
+  statusEl.textContent = autoSnap
+    ? '🤏 Auto snap aktif — gerakkan tangan!'
+    : 'Manual mode — tap 📸 untuk foto';
+}
+function toggleTimer() {
+  timerMode = !timerMode;
+  document.getElementById('timerBtn').classList.toggle('on', timerMode);
+  statusEl.textContent = timerMode ? '⏱️ Timer 3s aktif' : 'Timer off';
 }
 
-// ── Quotes ────────────────────────────────────────────────────────────────────
-const QUOTES = [
-  "Senyum itu gratis ✨","You look amazing 🌟","Cheese! 🧀",
-  "Strike a pose 💃","Camera loves you 📸","Living my best life 🔥",
-  "Main character ⭐","Glow up era 🌸","Too glam 💅",
-  "Unbothered 😌","Vibe check: ✔️","Built different 💪",
-  "Soft life 🕊️","No bad days 🌈","Iconic 🏆",
-];
-let quote = QUOTES[0], qTimer = 0;
-
-// ── Landmarks ────────────────────────────────────────────────────────────────
-let faceLM = null, handLMs = [];
-const NOSE=1, FORE=10, CHIN=152, LCHK=234, RCHK=454;
-const LEYE_C=159, REYE_C=386, LEYE_L=33, REYE_R=263, LIP_T=13;
-
-// ── MediaPipe ─────────────────────────────────────────────────────────────────
-let readyCount = 0;
-function checkReady() {
-  readyCount++;
-  if (readyCount >= 2) status.textContent = 'Siap! Hadapkan wajah ke kamera 😊';
-}
-
-const faceMesh = new FaceMesh({ locateFile: f =>
-  `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${f}` });
-faceMesh.setOptions({ maxNumFaces:1, refineLandmarks:true,
-  minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
-faceMesh.onResults(r => { faceLM = r.multiFaceLandmarks?.[0] || null; });
-
-const handsMP = new Hands({ locateFile: f =>
-  `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
-handsMP.setOptions({ maxNumHands:2, modelComplexity:1,
-  minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
-handsMP.onResults(r => { handLMs = r.multiHandLandmarks || []; });
-
-faceMesh.initialize().then(checkReady).catch(()=>{ readyCount++; checkReady(); });
-handsMP.initialize().then(checkReady).catch(()=>{ readyCount++; checkReady(); });
-
-// ── Camera stream ─────────────────────────────────────────────────────────────
+// ── Camera ────────────────────────────────────────────────────────────────────
 navigator.mediaDevices.getUserMedia({
-  video:{ facingMode:'user', width:{ideal:640}, height:{ideal:480} }, audio:false
-}).then(s => {
-  video.srcObject = s;
+  video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} },
+  audio:false
+}).then(stream => {
+  video.srcObject = stream;
   video.onloadedmetadata = () => {
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    loop();
+    initMotion();
+    statusEl.textContent = '🤏 Auto snap aktif — gerakkan tangan!';
   };
-}).catch(() => { status.textContent = '❌ Kamera tidak bisa diakses'; });
-
-// ── Off-screen canvas for MediaPipe (unmirrored) ──────────────────────────────
-// CRITICAL FIX: MediaPipe needs unmirrored frames.
-// We draw video normally (no flip) to a hidden canvas, then send that.
-const mpCanvas = document.createElement('canvas');
-const mpCtx = mpCanvas.getContext('2d');
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-// Coordinates from MediaPipe are in [0,1] normalized for the UNMIRRORED frame.
-// Since video is displayed mirrored (scaleX:-1), we flip X when drawing:
-// mirroredX = canvas.width - (lm.x * canvas.width)
-function Px(lm) { return canvas.width - lm.x * canvas.width; }
-function Py(lm) { return lm.y * canvas.height; }
-function P(i) {
-  if (!faceLM) return null;
-  return { x: Px(faceLM[i]), y: Py(faceLM[i]) };
-}
-
-// ── Skull mesh ────────────────────────────────────────────────────────────────
-function drawSkull() {
-  if (!faceLM) return;
-  const CONNS = [
-    [10,338],[338,297],[297,332],[332,284],[284,251],[251,389],[389,356],[356,454],
-    [454,323],[323,361],[361,288],[288,397],[397,365],[365,379],[379,378],[378,400],
-    [400,377],[377,152],[152,148],[148,176],[176,149],[149,150],[150,136],[136,172],
-    [172,58],[58,132],[132,93],[93,234],[234,127],[127,162],[162,21],[21,54],[54,103],
-    [103,67],[67,109],[109,10],
-    [168,6],[6,197],[197,195],[195,5],[5,4],[4,1],
-    [33,246],[246,161],[161,160],[160,159],[159,158],[158,157],[157,173],
-    [133,155],[155,154],[154,153],[153,145],[145,144],[144,163],[163,7],[7,33],
-    [362,398],[398,384],[384,385],[385,386],[386,387],[387,388],[466,263],
-    [263,249],[249,390],[390,373],[373,374],[374,380],[380,381],[381,382],[382,362],
-  ];
-  ctx.save();
-  ctx.strokeStyle='rgba(0,255,100,0.65)'; ctx.lineWidth=0.9;
-  for (const [a,b] of CONNS) {
-    ctx.beginPath();
-    ctx.moveTo(Px(faceLM[a]), Py(faceLM[a]));
-    ctx.lineTo(Px(faceLM[b]), Py(faceLM[b]));
-    ctx.stroke();
-  }
-  ctx.fillStyle='rgba(0,255,100,0.75)';
-  for (const p of faceLM) {
-    ctx.beginPath();
-    ctx.arc(Px(p), Py(p), 0.9, 0, Math.PI*2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-// ── Stickers ──────────────────────────────────────────────────────────────────
-function drawStickers() {
-  if (!faceLM) return;
-  const nose=P(NOSE), fore=P(FORE), chin=P(CHIN);
-  const lc=P(LCHK), rc=P(RCHK);
-  if (!nose||!fore||!chin||!lc||!rc) return;
-  const fW=Math.abs(rc.x-lc.x), fH=Math.abs(chin.y-fore.y);
-  ctx.save();
-
-  // 🎩 Top hat
-  const hW=fW*1.15, hH=fH*0.55;
-  const hX=fore.x-hW/2, hY=fore.y-hH*1.1;
-  ctx.fillStyle='#1a0a00'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=2;
-  ctx.beginPath();
-  ctx.ellipse(fore.x, hY+hH+4, hW*0.62, hH*0.12, 0, 0, Math.PI*2);
-  ctx.fill(); ctx.stroke();
-  ctx.beginPath();
-  if(ctx.roundRect) ctx.roundRect(hX+hW*0.07, hY, hW*0.86, hH, 4);
-  else ctx.rect(hX+hW*0.07, hY, hW*0.86, hH);
-  ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#f5c518';
-  ctx.fillRect(hX+hW*0.07, hY+hH*0.75, hW*0.86, hH*0.12);
-
-  // 👓 Glasses
-  const eyeY=(P(LEYE_C).y+P(REYE_C).y)/2;
-  const lCx=P(LEYE_C).x, rCx=P(REYE_C).x;
-  const lensR=fW*0.17;
-  ctx.strokeStyle='#f5c518'; ctx.lineWidth=2.5;
-  ctx.fillStyle='rgba(245,197,24,0.08)';
-  ctx.beginPath(); ctx.arc(lCx,eyeY,lensR,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.arc(rCx,eyeY,lensR,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(lCx+lensR,eyeY); ctx.lineTo(rCx-lensR,eyeY); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(lCx-lensR,eyeY); ctx.lineTo(P(LEYE_L).x-fW*0.08,eyeY-4); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(rCx+lensR,eyeY); ctx.lineTo(P(REYE_R).x+fW*0.08,eyeY-4); ctx.stroke();
-
-  // 👨 Mustache
-  const mustY=(nose.y+P(LIP_T).y)/2, mustW=fW*0.36;
-  ctx.fillStyle='#3a1a00'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=1.5;
-  ctx.beginPath();
-  ctx.moveTo(nose.x,mustY);
-  ctx.bezierCurveTo(nose.x-mustW*0.3,mustY-6,nose.x-mustW,mustY+4,nose.x-mustW*0.9,mustY+10);
-  ctx.bezierCurveTo(nose.x-mustW*0.6,mustY+14,nose.x-mustW*0.2,mustY+8,nose.x,mustY);
-  ctx.fill(); ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(nose.x,mustY);
-  ctx.bezierCurveTo(nose.x+mustW*0.3,mustY-6,nose.x+mustW,mustY+4,nose.x+mustW*0.9,mustY+10);
-  ctx.bezierCurveTo(nose.x+mustW*0.6,mustY+14,nose.x+mustW*0.2,mustY+8,nose.x,mustY);
-  ctx.fill(); ctx.stroke();
-
-  ctx.restore();
-}
-
-// ── Quote ─────────────────────────────────────────────────────────────────────
-function drawQuote() {
-  if (!faceLM) return;
-  const fore = P(FORE);
-  if (!fore) return;
-  qTimer++;
-  if (qTimer > 150) { qTimer=0; quote=QUOTES[Math.floor(Math.random()*QUOTES.length)]; }
-  ctx.save();
-  const qx=fore.x, qy=Math.max(fore.y-28, 20);
-  const fs=Math.max(12, canvas.width*0.028);
-  ctx.font=`bold ${fs}px 'Courier New',monospace`;
-  const tw=ctx.measureText(quote).width, pad=10;
-  ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=1.5;
-  const bx=qx-tw/2-pad, by=qy-fs-pad/2, bw=tw+pad*2, bh=fs+pad;
-  if(ctx.roundRect) ctx.roundRect(bx,by,bw,bh,8); else ctx.rect(bx,by,bw,bh);
-  ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#f5c518'; ctx.textAlign='center'; ctx.textBaseline='bottom';
-  ctx.fillText(quote, qx, qy+1);
-  ctx.restore();
-}
-
-// ── Hand skeleton + particle system ──────────────────────────────────────────
-const HC=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
-  [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
-  [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
-
-// Particle pool
-const PARTICLES = [];
-const PARTICLE_EMOJIS = ['❤️','🌟','✨','💕','🌸','💫','⭐','🦋','💖','🌈','🎀','💝'];
-
-function spawnParticles(x, y) {
-  // Spawn 1-2 particles per fingertip per call (throttled by frame)
-  if (Math.random() > 0.35) return;
-  const emoji = PARTICLE_EMOJIS[Math.floor(Math.random() * PARTICLE_EMOJIS.length)];
-  PARTICLES.push({
-    x, y,
-    vx: (Math.random() - 0.5) * 2.5,   // drift left/right
-    vy: -(Math.random() * 2.5 + 1.2),  // float upward
-    size: Math.random() * 14 + 10,      // 10–24px
-    life: 1.0,                          // starts fully opaque
-    decay: Math.random() * 0.018 + 0.012, // fade speed
-    emoji,
-    spin: (Math.random() - 0.5) * 0.1,
-    angle: 0,
-  });
-}
-
-function updateParticles() {
-  for (let i = PARTICLES.length - 1; i >= 0; i--) {
-    const p = PARTICLES[i];
-    p.x    += p.vx;
-    p.y    += p.vy;
-    p.vy   *= 0.98;   // slight gravity
-    p.life -= p.decay;
-    p.angle += p.spin;
-    if (p.life <= 0) { PARTICLES.splice(i, 1); }
-  }
-}
-
-function drawParticles() {
-  ctx.save();
-  for (const p of PARTICLES) {
-    ctx.globalAlpha = Math.max(0, p.life);
-    ctx.font = `${p.size}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(p.angle);
-    ctx.fillText(p.emoji, 0, 0);
-    ctx.restore();
-  }
-  ctx.globalAlpha = 1;
-  ctx.restore();
-}
-
-function drawHands() {
-  if (!handLMs.length) {
-    // Still update & draw existing particles even when hand leaves frame
-    updateParticles();
-    drawParticles();
-    return;
-  }
-  const COLS=['#00e5ff','#ff6ec7'];
-  for (let hi=0; hi<handLMs.length; hi++) {
-    const hl=handLMs[hi], col=COLS[hi%2];
-    ctx.save();
-    ctx.strokeStyle=col; ctx.lineWidth=2.2;
-    for (const [a,b] of HC) {
-      ctx.beginPath();
-      ctx.moveTo(canvas.width-hl[a].x*canvas.width, hl[a].y*canvas.height);
-      ctx.lineTo(canvas.width-hl[b].x*canvas.width, hl[b].y*canvas.height);
-      ctx.stroke();
-    }
-    ctx.fillStyle=col;
-    for (const p of hl) {
-      ctx.beginPath();
-      ctx.arc(canvas.width-p.x*canvas.width, p.y*canvas.height, 2.5, 0, Math.PI*2);
-      ctx.fill();
-    }
-    // Fingertips: bigger dot + spawn particles
-    for (const t of [4,8,12,16,20]) {
-      const fx = canvas.width - hl[t].x * canvas.width;
-      const fy = hl[t].y * canvas.height;
-      ctx.beginPath();
-      ctx.arc(fx, fy, 5, 0, Math.PI*2);
-      ctx.fill();
-      spawnParticles(fx, fy);
-    }
-    ctx.restore();
-  }
-  updateParticles();
-  drawParticles();
-}
-
-// ── Main loop ─────────────────────────────────────────────────────────────────
-let fc=0;
-async function loop() {
-  if (isPreviewMode) { requestAnimationFrame(loop); return; }
-
-  canvas.width  = video.videoWidth  || canvas.width;
-  canvas.height = video.videoHeight || canvas.height;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  // Send UNMIRRORED frames to MediaPipe
-  if (video.readyState >= 2) {
-    mpCanvas.width  = video.videoWidth;
-    mpCanvas.height = video.videoHeight;
-    mpCtx.drawImage(video, 0, 0); // no flip — raw frame
-    fc++;
-    if (fc%2===0) faceMesh.send({image:mpCanvas}).catch(()=>{});
-    if (fc%3===0) handsMP.send({image:mpCanvas}).catch(()=>{});
-  }
-
-  if (feat.skull   && faceLM)          drawSkull();
-  if (feat.sticker && faceLM)          drawStickers();
-  if (feat.quote   && faceLM)          drawQuote();
-  if (feat.hand    && handLMs.length)  drawHands();
-
-  // Face indicator dot
-  ctx.fillStyle = faceLM ? '#00ff80' : '#ff4444';
-  ctx.beginPath(); ctx.arc(12,12,6,0,Math.PI*2); ctx.fill();
-  if (faceLM) {
-    ctx.fillStyle='rgba(0,255,128,0.18)';
-    ctx.beginPath(); ctx.arc(12,12,13,0,Math.PI*2); ctx.fill();
-  }
-
-  status.textContent = readyCount < 2
-    ? 'Memuat model AI...'
-    : (faceLM ? '😊 Wajah terdeteksi — siap foto!' : '👀 Hadapkan wajah ke kamera...');
-
-  requestAnimationFrame(loop);
-}
-
-// ── Capture ───────────────────────────────────────────────────────────────────
-captBtn.addEventListener('click', () => {
-  // Flash
-  flash.style.opacity='1'; flash.style.transition='';
-  setTimeout(()=>{ flash.style.transition='opacity 0.3s'; flash.style.opacity='0'; },50);
-
-  const cap = document.createElement('canvas');
-  cap.width=canvas.width; cap.height=canvas.height;
-  const cc=cap.getContext('2d');
-
-  // Draw video mirrored (natural selfie)
-  cc.save();
-  cc.translate(cap.width,0); cc.scale(-1,1);
-  cc.drawImage(video,0,0,cap.width,cap.height);
-  cc.restore();
-
-  // Draw overlay — coordinates already flipped via Px(), so draw as-is
-  cc.drawImage(canvas,0,0);
-
-  capturedDataUrl = cap.toDataURL('image/jpeg', 0.93);
-
-  // Show preview
-  previewImg.src = capturedDataUrl;
-  previewBox.style.display = 'block';
-  isPreviewMode = true;
-  status.textContent = '✅ Foto diambil! Klik "Gunakan Foto Ini" untuk melanjutkan.';
+}).catch(() => {
+  statusEl.textContent = '❌ Kamera tidak dapat diakses';
 });
 
-function retake() {
-  capturedDataUrl = null;
-  previewBox.style.display = 'none';
-  isPreviewMode = false;
-  status.textContent = '👀 Hadapkan wajah ke kamera...';
+// ── Motion detection ──────────────────────────────────────────────────────────
+let prevFrame   = null;
+let motionScore = 0;
+let motionHoldFrames = 0;     // frames motion stays high
+const MOTION_THRESHOLD = 18;  // pixel diff threshold per channel
+const MOTION_TRIGGER   = 0.06; // 6% of pixels must move
+const HOLD_FRAMES      = 8;   // frames motion must persist before trigger
+
+const motionCanvas = document.createElement('canvas');
+const motionCtx    = motionCanvas.getContext('2d', { willReadFrequently:true });
+const SAMPLE_W = 160, SAMPLE_H = 90; // low-res for perf
+
+function initMotion() {
+  motionCanvas.width  = SAMPLE_W;
+  motionCanvas.height = SAMPLE_H;
+  requestAnimationFrame(motionLoop);
 }
 
-function sendPhoto() {
-  if (!capturedDataUrl) return;
-  // Post to parent Streamlit window
-  window.parent.postMessage({ type:'PHOTO_CAPTURED', dataUrl: capturedDataUrl }, '*');
-  status.textContent = '📤 Mengirim foto ke aplikasi...';
-  document.getElementById('sendBtn').textContent = '⏳ Mengirim...';
-  document.getElementById('sendBtn').disabled = true;
+function motionLoop() {
+  requestAnimationFrame(motionLoop);
+  if (previewMode || capturing) return;
+  if (video.readyState < 2) return;
+
+  // Draw current frame low-res
+  motionCtx.drawImage(video, 0, 0, SAMPLE_W, SAMPLE_H);
+  const curr = motionCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H).data;
+
+  if (!prevFrame) {
+    prevFrame = new Uint8ClampedArray(curr);
+    return;
+  }
+
+  // Compare frames
+  let diffPixels = 0;
+  const total = SAMPLE_W * SAMPLE_H;
+  for (let i = 0; i < curr.length; i += 4) {
+    const dr = Math.abs(curr[i]   - prevFrame[i]);
+    const dg = Math.abs(curr[i+1] - prevFrame[i+1]);
+    const db = Math.abs(curr[i+2] - prevFrame[i+2]);
+    if ((dr + dg + db) / 3 > MOTION_THRESHOLD) diffPixels++;
+  }
+
+  // Copy current to prev
+  prevFrame.set(curr);
+
+  const ratio = diffPixels / total;
+  // Smooth score
+  motionScore = motionScore * 0.7 + ratio * 0.3;
+  motionFill.style.width = Math.min(100, motionScore * 800) + '%';
+
+  // Color bar: green when triggered, yellow otherwise
+  if (motionScore > MOTION_TRIGGER) {
+    motionFill.style.background = '#00e676';
+    motionHoldFrames++;
+  } else {
+    motionFill.style.background = '#f5c518';
+    motionHoldFrames = 0;
+  }
+
+  // Trigger auto snap
+  if (autoSnap && motionHoldFrames >= HOLD_FRAMES && !capturing) {
+    motionHoldFrames = 0;
+    startCapture();
+  }
+
+  // Status
+  if (!capturing) {
+    if (motionScore > MOTION_TRIGGER) {
+      statusEl.textContent = '✋ Gerakan terdeteksi...';
+    } else {
+      statusEl.textContent = autoSnap
+        ? '🤏 Gerakkan tangan untuk snap otomatis'
+        : '📸 Tap tombol untuk foto';
+    }
+  }
+}
+
+// ── Capture flow ──────────────────────────────────────────────────────────────
+function startCapture() {
+  if (capturing || previewMode) return;
+  if (timerMode) {
+    runCountdown(3);
+  } else {
+    doSnap();
+  }
+}
+
+function runCountdown(n) {
+  if (n <= 0) { doSnap(); return; }
+  capturing = true;
+  cdNum.textContent = n;
+  cdOverlay.style.opacity = '1';
+  cdNum.style.transform = 'scale(1.3)';
+  cdNum.style.transition = 'transform 0.15s';
+  setTimeout(() => { cdNum.style.transform = 'scale(1)'; }, 150);
+  statusEl.textContent = `📸 Bersiap... ${n}`;
+  setTimeout(() => runCountdown(n - 1), 1000);
+}
+
+function doSnap() {
+  cdOverlay.style.opacity = '0';
+  capturing = false;
+
+  // Flash
+  flash.style.transition = '';
+  flash.style.opacity = '1';
+  setTimeout(() => {
+    flash.style.transition = 'opacity 0.3s';
+    flash.style.opacity = '0';
+  }, 60);
+
+  // Capture to canvas
+  const cap = document.createElement('canvas');
+  cap.width  = video.videoWidth  || 1280;
+  cap.height = video.videoHeight || 720;
+  const cc = cap.getContext('2d');
+  // Mirror to match selfie preview
+  cc.translate(cap.width, 0);
+  cc.scale(-1, 1);
+  cc.drawImage(video, 0, 0, cap.width, cap.height);
+
+  capturedUrl = cap.toDataURL('image/jpeg', 0.93);
+
+  // Langsung kirim ke Streamlit — auto simpan
+  window.parent.postMessage({ type:'PHOTO_CAPTURED', dataUrl: capturedUrl }, '*');
+
+  // Tampilkan preview + tombol ambil ulang
+  previewImg.src = capturedUrl;
+  previewBox.style.display = 'block';
+  previewMode = true;
+  statusEl.textContent = '✅ Foto tersimpan otomatis!';
+}
+
+function retake() {
+  capturedUrl = null;
+  previewBox.style.display = 'none';
+  previewMode = false;
+  prevFrame   = null;
+  statusEl.textContent = '🤏 Gerakkan tangan untuk snap otomatis';
 }
 </script>
 </body>
