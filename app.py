@@ -153,6 +153,16 @@ TEMPLATES = {
         "border": 4,
         "style": "wallet",
     },
+    "studio_print": {
+        "name": "Studio Print",
+        "w": 7.0, "h": 9.5,
+        "cols": 2, "rows": 2,
+        "desc": "2×2 = 4 foto\nGaya photo booth studio",
+        "icon": "🏪",
+        "bg_color": (255, 255, 255),
+        "border": 6,
+        "style": "studio",
+    },
 }
 
 # ── Photo Filter / Tema definitions ───────────────────────────────────────────
@@ -390,6 +400,89 @@ def add_polaroid_frame(img: Image.Image, border_px: int, tpl: dict) -> Image.Ima
     else:
         return img
 
+def build_studio_sheet(photo: Image.Image, tpl: dict, filter_key: str,
+                        studio_name: str = "Photo Booth Studio",
+                        studio_sub: str = "NEW WAVE PHOTO STUDIO") -> Image.Image:
+    """Build oh!shoot-style studio print with logo text top & bottom."""
+    cols, rows = tpl["cols"], tpl["rows"]
+    photo_w_px = cm_to_px(tpl["w"])
+    photo_h_px = cm_to_px(tpl["h"])
+    gap_px     = cm_to_px(0.25)
+    margin_px  = cm_to_px(0.5)
+
+    filtered = apply_filter(photo, filter_key)
+    cell = fit_crop(filtered, photo_w_px, photo_h_px)
+    cell_w, cell_h = cell.size
+
+    # Logo area heights
+    logo_top_h    = cm_to_px(1.4)
+    logo_bottom_h = cm_to_px(1.8)
+
+    sheet_w = margin_px * 2 + cell_w * cols + gap_px * (cols - 1)
+    sheet_h = (margin_px * 2 + cell_h * rows + gap_px * (rows - 1)
+               + logo_top_h + logo_bottom_h)
+
+    sheet = Image.new("RGB", (sheet_w, sheet_h), (255, 255, 255))
+    draw  = ImageDraw.Draw(sheet)
+
+    # ── Top logo area ──────────────────────────────────────────────────────────
+    top_text_y = logo_top_h // 2
+    try:
+        font_logo = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                                        int(cm_to_px(0.55)))
+        font_sub  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                                        int(cm_to_px(0.25)))
+    except Exception:
+        font_logo = ImageFont.load_default()
+        font_sub  = font_logo
+
+    # Studio name top-center
+    bbox = draw.textbbox((0, 0), studio_name, font=font_logo)
+    tw = bbox[2] - bbox[0]
+    draw.text(((sheet_w - tw) // 2, top_text_y - (bbox[3]-bbox[1])//2 - int(cm_to_px(0.1))),
+              studio_name, fill=(180, 40, 40), font=font_logo)
+
+    # ── Paste photo grid ──────────────────────────────────────────────────────
+    grid_y_offset = logo_top_h + margin_px
+    for r in range(rows):
+        for c in range(cols):
+            x = margin_px + c * (cell_w + gap_px)
+            y = grid_y_offset + r * (cell_h + gap_px)
+            # Thin border around each photo
+            border_col = (220, 220, 220)
+            bp = 3  # border px
+            draw.rectangle([x-bp, y-bp, x+cell_w+bp, y+cell_h+bp], outline=border_col, width=bp)
+            sheet.paste(cell, (x, y))
+
+    # ── Bottom logo area ──────────────────────────────────────────────────────
+    bottom_y = sheet_h - logo_bottom_h
+    # Divider line
+    draw.line([(margin_px, bottom_y + int(cm_to_px(0.15))),
+               (sheet_w - margin_px, bottom_y + int(cm_to_px(0.15)))],
+              fill=(220, 220, 220), width=2)
+
+    # Big studio name bottom-center
+    try:
+        font_big = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                                       int(cm_to_px(0.7)))
+    except Exception:
+        font_big = ImageFont.load_default()
+
+    bbox_big = draw.textbbox((0, 0), studio_name, font=font_big)
+    bw = bbox_big[2] - bbox_big[0]
+    bh = bbox_big[3] - bbox_big[1]
+    name_y = bottom_y + int(cm_to_px(0.35))
+    draw.text(((sheet_w - bw) // 2, name_y), studio_name, fill=(180, 40, 40), font=font_big)
+
+    # Subtitle
+    bbox_sub = draw.textbbox((0, 0), studio_sub, font=font_sub)
+    sw2 = bbox_sub[2] - bbox_sub[0]
+    draw.text(((sheet_w - sw2) // 2, name_y + bh + int(cm_to_px(0.08))),
+              studio_sub, fill=(160, 160, 160), font=font_sub)
+
+    return sheet
+
+
 def build_sheet(photo: Image.Image, tpl: dict, filter_key: str = "normal") -> Image.Image:
     cols, rows = tpl["cols"], tpl["rows"]
     photo_w_px = cm_to_px(tpl["w"])
@@ -501,10 +594,10 @@ def get_ar_camera_html():
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:#111; font-family:'Courier New',monospace; color:#eee; }
-#wrap { position:relative; width:100%; max-width:480px; margin:0 auto; }
+#wrap { position:relative; width:100%; max-width:520px; margin:0 auto; }
 #video {
   width:100%; display:block; border-radius:10px;
-  transform:scaleX(-1); /* mirror preview like a normal selfie camera */
+  transform:scaleX(-1);
 }
 #overlay {
   position:absolute; top:0; left:0; width:100%; height:100%;
@@ -516,7 +609,7 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 }
 #captureBtn {
   background:#f5c518; color:#000; border:none; border-radius:50%;
-  width:58px; height:58px; font-size:22px; cursor:pointer; font-weight:bold;
+  width:62px; height:62px; font-size:24px; cursor:pointer; font-weight:bold;
   box-shadow:0 0 0 4px #333; transition:transform 0.1s, box-shadow 0.1s;
   flex-shrink:0;
 }
@@ -529,13 +622,27 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 .tbtn.on { background:#1e1e0a; color:#f5c518; border-color:#f5c518; }
 #status {
   text-align:center; color:#888; font-size:11px; margin-top:6px;
-  min-height:16px; letter-spacing:0.5px;
+  min-height:18px; letter-spacing:0.5px; padding:0 8px;
 }
 #flash {
   position:absolute; top:0; left:0; width:100%; height:100%;
   background:white; border-radius:10px; opacity:0; pointer-events:none;
-  transition:opacity 0.05s;
 }
+#preview-box {
+  margin-top:10px; text-align:center; display:none;
+}
+#preview-box img {
+  max-width:100%; border-radius:8px; border:2px solid #f5c518;
+}
+#preview-box p {
+  font-size:11px; color:#aaa; margin-top:4px;
+}
+#sendBtn {
+  margin-top:6px; background:#f5c518; color:#000; border:none;
+  border-radius:8px; padding:8px 20px; font-size:13px;
+  font-weight:800; cursor:pointer; width:100%;
+}
+#sendBtn:hover { background:#d4a800; }
 </style>
 </head>
 <body>
@@ -545,13 +652,26 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
   <div id="flash"></div>
 </div>
 <div id="controls">
-  <button class="tbtn" id="btnSkull"   onclick="tog('skull')">💀 Skull</button>
+  <button class="tbtn" id="btnSkull"    onclick="tog('skull')">💀 Skull</button>
   <button class="tbtn on" id="btnSticker" onclick="tog('sticker')">🎩 Sticker</button>
   <button id="captureBtn" title="Ambil Foto">📸</button>
   <button class="tbtn on" id="btnQuote"   onclick="tog('quote')">💬 Quote</button>
-  <button class="tbtn" id="btnHand"    onclick="tog('hand')">✋ Tangan</button>
+  <button class="tbtn" id="btnHand"     onclick="tog('hand')">✋ Tangan</button>
 </div>
 <div id="status">Memuat model AI...</div>
+
+<!-- Preview hasil capture + tombol simpan -->
+<div id="preview-box">
+  <p>📸 Hasil foto — klik Gunakan Foto untuk melanjutkan</p>
+  <img id="preview-img" src="" alt="preview"/>
+  <button id="sendBtn" onclick="sendPhoto()">✅ Gunakan Foto Ini</button>
+  <button class="tbtn" style="width:100%;margin-top:4px;" onclick="retake()">🔄 Ambil Ulang</button>
+</div>
+
+<!-- Hidden form to post base64 back to Streamlit parent -->
+<form id="photoForm" style="display:none;">
+  <textarea id="photoData"></textarea>
+</form>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
@@ -563,16 +683,20 @@ const ctx     = canvas.getContext('2d');
 const status  = document.getElementById('status');
 const flash   = document.getElementById('flash');
 const captBtn = document.getElementById('captureBtn');
+const previewBox = document.getElementById('preview-box');
+const previewImg = document.getElementById('preview-img');
 
 const feat = { skull:false, sticker:true, quote:true, hand:false };
+let capturedDataUrl = null;
+let isPreviewMode = false;
 
 function tog(f) {
   feat[f] = !feat[f];
-  document.getElementById('btn' + f.charAt(0).toUpperCase() + f.slice(1))
+  document.getElementById('btn'+f.charAt(0).toUpperCase()+f.slice(1))
     .classList.toggle('on', feat[f]);
 }
 
-// ── Quotes ───────────────────────────────────────────────────────────────────
+// ── Quotes ────────────────────────────────────────────────────────────────────
 const QUOTES = [
   "Senyum itu gratis ✨","You look amazing 🌟","Cheese! 🧀",
   "Strike a pose 💃","Camera loves you 📸","Living my best life 🔥",
@@ -582,19 +706,16 @@ const QUOTES = [
 ];
 let quote = QUOTES[0], qTimer = 0;
 
-// ── Landmarks state ───────────────────────────────────────────────────────────
+// ── Landmarks ────────────────────────────────────────────────────────────────
 let faceLM = null, handLMs = [];
-
-// Key indices
 const NOSE=1, FORE=10, CHIN=152, LCHK=234, RCHK=454;
 const LEYE_C=159, REYE_C=386, LEYE_L=33, REYE_R=263, LIP_T=13;
-const LBROW=[70,63,105,66,107], RBROW=[336,296,334,293,300];
 
-// ── MediaPipe init ────────────────────────────────────────────────────────────
+// ── MediaPipe ─────────────────────────────────────────────────────────────────
 let readyCount = 0;
 function checkReady() {
   readyCount++;
-  if (readyCount === 2) status.textContent = 'Siap! Hadapkan wajah ke kamera 😊';
+  if (readyCount >= 2) status.textContent = 'Siap! Hadapkan wajah ke kamera 😊';
 }
 
 const faceMesh = new FaceMesh({ locateFile: f =>
@@ -609,31 +730,41 @@ handsMP.setOptions({ maxNumHands:2, modelComplexity:1,
   minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
 handsMP.onResults(r => { handLMs = r.multiHandLandmarks || []; });
 
-faceMesh.initialize().then(checkReady).catch(()=>{ readyCount++; });
-handsMP.initialize().then(checkReady).catch(()=>{ readyCount++; });
+faceMesh.initialize().then(checkReady).catch(()=>{ readyCount++; checkReady(); });
+handsMP.initialize().then(checkReady).catch(()=>{ readyCount++; checkReady(); });
 
-// ── Camera ───────────────────────────────────────────────────────────────────
-navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:640, height:480 }, audio:false })
-  .then(s => {
-    video.srcObject = s;
-    video.onloadedmetadata = () => {
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
-      loop();
-    };
-  })
-  .catch(() => status.textContent = '❌ Kamera tidak bisa diakses');
+// ── Camera stream ─────────────────────────────────────────────────────────────
+navigator.mediaDevices.getUserMedia({
+  video:{ facingMode:'user', width:{ideal:640}, height:{ideal:480} }, audio:false
+}).then(s => {
+  video.srcObject = s;
+  video.onloadedmetadata = () => {
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    loop();
+  };
+}).catch(() => { status.textContent = '❌ Kamera tidak bisa diakses'; });
+
+// ── Off-screen canvas for MediaPipe (unmirrored) ──────────────────────────────
+// CRITICAL FIX: MediaPipe needs unmirrored frames.
+// We draw video normally (no flip) to a hidden canvas, then send that.
+const mpCanvas = document.createElement('canvas');
+const mpCtx = mpCanvas.getContext('2d');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// Coordinates from MediaPipe are in [0,1] normalized for the UNMIRRORED frame.
+// Since video is displayed mirrored (scaleX:-1), we flip X when drawing:
+// mirroredX = canvas.width - (lm.x * canvas.width)
+function Px(lm) { return canvas.width - lm.x * canvas.width; }
+function Py(lm) { return lm.y * canvas.height; }
 function P(i) {
   if (!faceLM) return null;
-  return { x: faceLM[i].x * canvas.width, y: faceLM[i].y * canvas.height };
+  return { x: Px(faceLM[i]), y: Py(faceLM[i]) };
 }
 
 // ── Skull mesh ────────────────────────────────────────────────────────────────
 function drawSkull() {
   if (!faceLM) return;
-  ctx.save();
   const CONNS = [
     [10,338],[338,297],[297,332],[332,284],[284,251],[251,389],[389,356],[356,454],
     [454,323],[323,361],[361,288],[288,397],[397,365],[365,379],[379,378],[378,400],
@@ -646,19 +777,18 @@ function drawSkull() {
     [362,398],[398,384],[384,385],[385,386],[386,387],[387,388],[466,263],
     [263,249],[249,390],[390,373],[373,374],[374,380],[380,381],[381,382],[382,362],
   ];
-  ctx.strokeStyle = 'rgba(0,255,100,0.6)';
-  ctx.lineWidth = 0.9;
+  ctx.save();
+  ctx.strokeStyle='rgba(0,255,100,0.65)'; ctx.lineWidth=0.9;
   for (const [a,b] of CONNS) {
-    const pa = faceLM[a], pb = faceLM[b];
     ctx.beginPath();
-    ctx.moveTo(pa.x*canvas.width, pa.y*canvas.height);
-    ctx.lineTo(pb.x*canvas.width, pb.y*canvas.height);
+    ctx.moveTo(Px(faceLM[a]), Py(faceLM[a]));
+    ctx.lineTo(Px(faceLM[b]), Py(faceLM[b]));
     ctx.stroke();
   }
-  ctx.fillStyle = 'rgba(0,255,100,0.7)';
+  ctx.fillStyle='rgba(0,255,100,0.75)';
   for (const p of faceLM) {
     ctx.beginPath();
-    ctx.arc(p.x*canvas.width, p.y*canvas.height, 0.9, 0, Math.PI*2);
+    ctx.arc(Px(p), Py(p), 0.9, 0, Math.PI*2);
     ctx.fill();
   }
   ctx.restore();
@@ -670,93 +800,135 @@ function drawStickers() {
   const nose=P(NOSE), fore=P(FORE), chin=P(CHIN);
   const lc=P(LCHK), rc=P(RCHK);
   if (!nose||!fore||!chin||!lc||!rc) return;
-
-  const fW = Math.abs(rc.x - lc.x);
-  const fH = Math.abs(chin.y - fore.y);
+  const fW=Math.abs(rc.x-lc.x), fH=Math.abs(chin.y-fore.y);
   ctx.save();
 
   // 🎩 Top hat
-  const hW = fW*1.15, hH = fH*0.55;
-  const hX = fore.x - hW/2, hY = fore.y - hH*1.1;
-  // brim
-  ctx.fillStyle='#0d0600'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=2;
+  const hW=fW*1.15, hH=fH*0.55;
+  const hX=fore.x-hW/2, hY=fore.y-hH*1.1;
+  ctx.fillStyle='#1a0a00'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=2;
   ctx.beginPath();
-  ctx.ellipse(fore.x, hY+hH+3, hW*0.65, hH*0.13, 0, 0, Math.PI*2);
+  ctx.ellipse(fore.x, hY+hH+4, hW*0.62, hH*0.12, 0, 0, Math.PI*2);
   ctx.fill(); ctx.stroke();
-  // body
-  ctx.fillStyle='#0d0600';
   ctx.beginPath();
-  ctx.roundRect(hX+hW*0.08, hY, hW*0.84, hH, 5);
+  if(ctx.roundRect) ctx.roundRect(hX+hW*0.07, hY, hW*0.86, hH, 4);
+  else ctx.rect(hX+hW*0.07, hY, hW*0.86, hH);
   ctx.fill(); ctx.stroke();
-  // gold band
   ctx.fillStyle='#f5c518';
-  ctx.fillRect(hX+hW*0.08, hY+hH*0.76, hW*0.84, hH*0.11);
-  // buckle
-  ctx.strokeStyle='#0d0600'; ctx.lineWidth=1;
-  ctx.strokeRect(fore.x-7, hY+hH*0.76, 14, hH*0.11);
+  ctx.fillRect(hX+hW*0.07, hY+hH*0.75, hW*0.86, hH*0.12);
 
   // 👓 Glasses
-  const eyeY = (P(LEYE_C).y + P(REYE_C).y)/2;
+  const eyeY=(P(LEYE_C).y+P(REYE_C).y)/2;
   const lCx=P(LEYE_C).x, rCx=P(REYE_C).x;
-  const lR=fW*0.18;
+  const lensR=fW*0.17;
   ctx.strokeStyle='#f5c518'; ctx.lineWidth=2.5;
-  ctx.fillStyle='rgba(245,197,24,0.10)';
-  ctx.beginPath(); ctx.arc(lCx,eyeY,lR,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.arc(rCx,eyeY,lR,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(lCx+lR,eyeY); ctx.lineTo(rCx-lR,eyeY); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(lCx-lR,eyeY); ctx.lineTo(P(LEYE_L).x-fW*0.08,eyeY-4); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(rCx+lR,eyeY); ctx.lineTo(P(REYE_R).x+fW*0.08,eyeY-4); ctx.stroke();
+  ctx.fillStyle='rgba(245,197,24,0.08)';
+  ctx.beginPath(); ctx.arc(lCx,eyeY,lensR,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(rCx,eyeY,lensR,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lCx+lensR,eyeY); ctx.lineTo(rCx-lensR,eyeY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lCx-lensR,eyeY); ctx.lineTo(P(LEYE_L).x-fW*0.08,eyeY-4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(rCx+lensR,eyeY); ctx.lineTo(P(REYE_R).x+fW*0.08,eyeY-4); ctx.stroke();
 
-  // 👨 Moustache
-  const lip=P(LIP_T);
-  const mY=(nose.y+lip.y)/2, mW=fW*0.38;
-  ctx.fillStyle='#2a0f00'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=1.5;
-  // left
+  // 👨 Mustache
+  const mustY=(nose.y+P(LIP_T).y)/2, mustW=fW*0.36;
+  ctx.fillStyle='#3a1a00'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=1.5;
   ctx.beginPath();
-  ctx.moveTo(nose.x,mY);
-  ctx.bezierCurveTo(nose.x-mW*0.25,mY-7, nose.x-mW,mY+5, nose.x-mW*0.88,mY+11);
-  ctx.bezierCurveTo(nose.x-mW*0.55,mY+15, nose.x-mW*0.18,mY+9, nose.x,mY);
+  ctx.moveTo(nose.x,mustY);
+  ctx.bezierCurveTo(nose.x-mustW*0.3,mustY-6,nose.x-mustW,mustY+4,nose.x-mustW*0.9,mustY+10);
+  ctx.bezierCurveTo(nose.x-mustW*0.6,mustY+14,nose.x-mustW*0.2,mustY+8,nose.x,mustY);
   ctx.fill(); ctx.stroke();
-  // right
   ctx.beginPath();
-  ctx.moveTo(nose.x,mY);
-  ctx.bezierCurveTo(nose.x+mW*0.25,mY-7, nose.x+mW,mY+5, nose.x+mW*0.88,mY+11);
-  ctx.bezierCurveTo(nose.x+mW*0.55,mY+15, nose.x+mW*0.18,mY+9, nose.x,mY);
+  ctx.moveTo(nose.x,mustY);
+  ctx.bezierCurveTo(nose.x+mustW*0.3,mustY-6,nose.x+mustW,mustY+4,nose.x+mustW*0.9,mustY+10);
+  ctx.bezierCurveTo(nose.x+mustW*0.6,mustY+14,nose.x+mustW*0.2,mustY+8,nose.x,mustY);
   ctx.fill(); ctx.stroke();
 
   ctx.restore();
 }
 
-// ── Quote bubble ──────────────────────────────────────────────────────────────
+// ── Quote ─────────────────────────────────────────────────────────────────────
 function drawQuote() {
   if (!faceLM) return;
   const fore = P(FORE);
   if (!fore) return;
   qTimer++;
   if (qTimer > 150) { qTimer=0; quote=QUOTES[Math.floor(Math.random()*QUOTES.length)]; }
-
   ctx.save();
-  const fs = Math.max(13, canvas.width*0.030);
-  ctx.font = `bold ${fs}px 'Courier New',monospace`;
-  const tw = ctx.measureText(quote).width;
-  const pad=10, qx=fore.x, qy=Math.max(fore.y-36, fs+pad);
-  ctx.fillStyle='rgba(0,0,0,0.70)';
-  ctx.strokeStyle='#f5c518'; ctx.lineWidth=1.5;
-  ctx.beginPath();
-  ctx.roundRect(qx-tw/2-pad, qy-fs-4, tw+pad*2, fs+12, 8);
+  const qx=fore.x, qy=Math.max(fore.y-28, 20);
+  const fs=Math.max(12, canvas.width*0.028);
+  ctx.font=`bold ${fs}px 'Courier New',monospace`;
+  const tw=ctx.measureText(quote).width, pad=10;
+  ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.strokeStyle='#f5c518'; ctx.lineWidth=1.5;
+  const bx=qx-tw/2-pad, by=qy-fs-pad/2, bw=tw+pad*2, bh=fs+pad;
+  if(ctx.roundRect) ctx.roundRect(bx,by,bw,bh,8); else ctx.rect(bx,by,bw,bh);
   ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#f5c518';
-  ctx.textAlign='center'; ctx.textBaseline='bottom';
-  ctx.fillText(quote, qx, qy+3);
+  ctx.fillStyle='#f5c518'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText(quote, qx, qy+1);
   ctx.restore();
 }
 
-// ── Hand skeleton ─────────────────────────────────────────────────────────────
+// ── Hand skeleton + particle system ──────────────────────────────────────────
 const HC=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
   [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
   [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
 
+// Particle pool
+const PARTICLES = [];
+const PARTICLE_EMOJIS = ['❤️','🌟','✨','💕','🌸','💫','⭐','🦋','💖','🌈','🎀','💝'];
+
+function spawnParticles(x, y) {
+  // Spawn 1-2 particles per fingertip per call (throttled by frame)
+  if (Math.random() > 0.35) return;
+  const emoji = PARTICLE_EMOJIS[Math.floor(Math.random() * PARTICLE_EMOJIS.length)];
+  PARTICLES.push({
+    x, y,
+    vx: (Math.random() - 0.5) * 2.5,   // drift left/right
+    vy: -(Math.random() * 2.5 + 1.2),  // float upward
+    size: Math.random() * 14 + 10,      // 10–24px
+    life: 1.0,                          // starts fully opaque
+    decay: Math.random() * 0.018 + 0.012, // fade speed
+    emoji,
+    spin: (Math.random() - 0.5) * 0.1,
+    angle: 0,
+  });
+}
+
+function updateParticles() {
+  for (let i = PARTICLES.length - 1; i >= 0; i--) {
+    const p = PARTICLES[i];
+    p.x    += p.vx;
+    p.y    += p.vy;
+    p.vy   *= 0.98;   // slight gravity
+    p.life -= p.decay;
+    p.angle += p.spin;
+    if (p.life <= 0) { PARTICLES.splice(i, 1); }
+  }
+}
+
+function drawParticles() {
+  ctx.save();
+  for (const p of PARTICLES) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.font = `${p.size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    ctx.fillText(p.emoji, 0, 0);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 function drawHands() {
+  if (!handLMs.length) {
+    // Still update & draw existing particles even when hand leaves frame
+    updateParticles();
+    drawParticles();
+    return;
+  }
   const COLS=['#00e5ff','#ff6ec7'];
   for (let hi=0; hi<handLMs.length; hi++) {
     const hl=handLMs[hi], col=COLS[hi%2];
@@ -764,43 +936,54 @@ function drawHands() {
     ctx.strokeStyle=col; ctx.lineWidth=2.2;
     for (const [a,b] of HC) {
       ctx.beginPath();
-      ctx.moveTo(hl[a].x*canvas.width, hl[a].y*canvas.height);
-      ctx.lineTo(hl[b].x*canvas.width, hl[b].y*canvas.height);
+      ctx.moveTo(canvas.width-hl[a].x*canvas.width, hl[a].y*canvas.height);
+      ctx.lineTo(canvas.width-hl[b].x*canvas.width, hl[b].y*canvas.height);
       ctx.stroke();
     }
     ctx.fillStyle=col;
     for (const p of hl) {
       ctx.beginPath();
-      ctx.arc(p.x*canvas.width, p.y*canvas.height, 2.5, 0, Math.PI*2);
+      ctx.arc(canvas.width-p.x*canvas.width, p.y*canvas.height, 2.5, 0, Math.PI*2);
       ctx.fill();
     }
+    // Fingertips: bigger dot + spawn particles
     for (const t of [4,8,12,16,20]) {
+      const fx = canvas.width - hl[t].x * canvas.width;
+      const fy = hl[t].y * canvas.height;
       ctx.beginPath();
-      ctx.arc(hl[t].x*canvas.width, hl[t].y*canvas.height, 5, 0, Math.PI*2);
+      ctx.arc(fx, fy, 5, 0, Math.PI*2);
       ctx.fill();
+      spawnParticles(fx, fy);
     }
     ctx.restore();
   }
+  updateParticles();
+  drawParticles();
 }
 
 // ── Main loop ─────────────────────────────────────────────────────────────────
 let fc=0;
 async function loop() {
+  if (isPreviewMode) { requestAnimationFrame(loop); return; }
+
   canvas.width  = video.videoWidth  || canvas.width;
   canvas.height = video.videoHeight || canvas.height;
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // Send frames to mediapipe (staggered)
-  fc++;
-  if (video.readyState>=2) {
-    if (fc%2===0) faceMesh.send({image:video}).catch(()=>{});
-    if (fc%3===0) handsMP.send({image:video}).catch(()=>{});
+  // Send UNMIRRORED frames to MediaPipe
+  if (video.readyState >= 2) {
+    mpCanvas.width  = video.videoWidth;
+    mpCanvas.height = video.videoHeight;
+    mpCtx.drawImage(video, 0, 0); // no flip — raw frame
+    fc++;
+    if (fc%2===0) faceMesh.send({image:mpCanvas}).catch(()=>{});
+    if (fc%3===0) handsMP.send({image:mpCanvas}).catch(()=>{});
   }
 
-  if (feat.skull)   drawSkull();
-  if (feat.sticker && faceLM) drawStickers();
-  if (feat.quote  && faceLM) drawQuote();
-  if (feat.hand   && handLMs.length) drawHands();
+  if (feat.skull   && faceLM)          drawSkull();
+  if (feat.sticker && faceLM)          drawStickers();
+  if (feat.quote   && faceLM)          drawQuote();
+  if (feat.hand    && handLMs.length)  drawHands();
 
   // Face indicator dot
   ctx.fillStyle = faceLM ? '#00ff80' : '#ff4444';
@@ -810,50 +993,56 @@ async function loop() {
     ctx.beginPath(); ctx.arc(12,12,13,0,Math.PI*2); ctx.fill();
   }
 
-  status.textContent = readyCount<2
+  status.textContent = readyCount < 2
     ? 'Memuat model AI...'
     : (faceLM ? '😊 Wajah terdeteksi — siap foto!' : '👀 Hadapkan wajah ke kamera...');
 
   requestAnimationFrame(loop);
 }
 
-// ── Capture photo ─────────────────────────────────────────────────────────────
+// ── Capture ───────────────────────────────────────────────────────────────────
 captBtn.addEventListener('click', () => {
-  // Flash effect
-  flash.style.opacity='1';
-  setTimeout(()=>{ flash.style.transition='opacity 0.3s'; flash.style.opacity='0';
-    setTimeout(()=>{ flash.style.transition=''; },300); },50);
+  // Flash
+  flash.style.opacity='1'; flash.style.transition='';
+  setTimeout(()=>{ flash.style.transition='opacity 0.3s'; flash.style.opacity='0'; },50);
 
   const cap = document.createElement('canvas');
   cap.width=canvas.width; cap.height=canvas.height;
   const cc=cap.getContext('2d');
 
-  // Draw video mirrored (natural selfie orientation)
+  // Draw video mirrored (natural selfie)
   cc.save();
   cc.translate(cap.width,0); cc.scale(-1,1);
   cc.drawImage(video,0,0,cap.width,cap.height);
   cc.restore();
 
-  // Draw overlays (landmarks were computed on mirrored preview coords, so also flip)
-  cc.save();
-  cc.translate(cap.width,0); cc.scale(-1,1);
+  // Draw overlay — coordinates already flipped via Px(), so draw as-is
   cc.drawImage(canvas,0,0);
-  cc.restore();
 
-  const dataUrl = cap.toDataURL('image/jpeg', 0.93);
+  capturedDataUrl = cap.toDataURL('image/jpeg', 0.93);
 
-  // Send to Streamlit via postMessage
-  window.parent.postMessage({ type:'PHOTO_CAPTURED', dataUrl }, '*');
-
-  // Also try direct input injection as fallback
-  try {
-    const allInputs = window.parent.document.querySelectorAll('input[aria-label="cam_bridge"]');
-    if (allInputs.length) {
-      allInputs[0].value = dataUrl;
-      allInputs[0].dispatchEvent(new Event('input',{bubbles:true}));
-    }
-  } catch(e){}
+  // Show preview
+  previewImg.src = capturedDataUrl;
+  previewBox.style.display = 'block';
+  isPreviewMode = true;
+  status.textContent = '✅ Foto diambil! Klik "Gunakan Foto Ini" untuk melanjutkan.';
 });
+
+function retake() {
+  capturedDataUrl = null;
+  previewBox.style.display = 'none';
+  isPreviewMode = false;
+  status.textContent = '👀 Hadapkan wajah ke kamera...';
+}
+
+function sendPhoto() {
+  if (!capturedDataUrl) return;
+  // Post to parent Streamlit window
+  window.parent.postMessage({ type:'PHOTO_CAPTURED', dataUrl: capturedDataUrl }, '*');
+  status.textContent = '📤 Mengirim foto ke aplikasi...';
+  document.getElementById('sendBtn').textContent = '⏳ Mengirim...';
+  document.getElementById('sendBtn').disabled = true;
+}
 </script>
 </body>
 </html>"""
@@ -871,6 +1060,10 @@ if "collage_layout" not in st.session_state:
     st.session_state.collage_layout = "grid"
 if "collage_filter" not in st.session_state:
     st.session_state.collage_filter = "normal"
+if "studio_name" not in st.session_state:
+    st.session_state.studio_name = "oh! shoot"
+if "studio_sub" not in st.session_state:
+    st.session_state.studio_sub = "NEW WAVE PHOTO STUDIO"
 
 # ── UI ─────────────────────────────────────────────────────────────────────────
 st.markdown("# 📸 Photo Booth Cetak")
@@ -890,34 +1083,45 @@ with col_left:
     input_mode = st.radio("Sumber foto", ["📷 Webcam", "📁 Upload File"], horizontal=True, label_visibility="collapsed")
 
     if input_mode == "📷 Webcam":
-        # ── AR Camera ────────────────────────────────────────────────────────
-        components.html(get_ar_camera_html(), height=560, scrolling=False)
+        # ── AR Camera preview ─────────────────────────────────────────────────
+        components.html(get_ar_camera_html(), height=620, scrolling=False)
 
-        # Bridge: JS postMessage → Streamlit text_input
-        # The JS in the iframe sends postMessage to parent; this sibling iframe
-        # listens and injects into the text_input below.
+        # ── JS bridge: receive postMessage from AR iframe ─────────────────────
+        # Uses a reliable relay: AR iframe → parent postMessage →
+        # sibling relay iframe → Streamlit session via URL hash trick
         components.html("""
         <script>
         window.addEventListener('message', function(e) {
-          if (e.data && e.data.type === 'PHOTO_CAPTURED') {
-            // Target our labelled input
-            const inp = window.parent.document.querySelector('input[aria-label="cam_bridge"]');
-            if (inp) {
-              const nativeInput = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
-              nativeInput.set.call(inp, e.data.dataUrl);
-              inp.dispatchEvent(new Event('input', {bubbles:true}));
+          if (!e.data || e.data.type !== 'PHOTO_CAPTURED') return;
+          const dataUrl = e.data.dataUrl;
+          // Store in sessionStorage so Streamlit can poll it
+          try { sessionStorage.setItem('photo_captured', dataUrl); } catch(err){}
+          // Also try injecting into the st.text_area below
+          try {
+            const allTA = window.parent.document.querySelectorAll('textarea');
+            for (const ta of allTA) {
+              if (ta.getAttribute('aria-label') === 'cam_bridge_ta') {
+                const nv = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+                nv.set.call(ta, dataUrl);
+                ta.dispatchEvent(new Event('input', {bubbles:true}));
+                break;
+              }
             }
-          }
+          } catch(err) {}
         });
         </script>
         """, height=0)
 
-        # Hidden bridge input — receives base64 from JS above
-        raw_b64 = st.text_input("cam_bridge", key="cam_bridge", label_visibility="collapsed")
-        if raw_b64 and raw_b64.startswith("data:image"):
-            header, b64data = raw_b64.split(",", 1)
-            img_bytes = base64.b64decode(b64data)
-            st.session_state.photo = Image.open(io.BytesIO(img_bytes))
+        raw_b64 = st.text_area("cam_bridge_ta", key="cam_bridge_ta",
+                                label_visibility="collapsed", height=68)
+        if raw_b64 and raw_b64.strip().startswith("data:image"):
+            try:
+                header, b64data = raw_b64.strip().split(",", 1)
+                img_bytes = base64.b64decode(b64data)
+                st.session_state.photo = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                st.success("✅ Foto dari kamera berhasil disimpan!")
+            except Exception:
+                pass
             st.session_state["cam_bridge"] = ""
             st.success("✅ Foto berhasil diambil!")
             st.rerun()
@@ -1025,15 +1229,39 @@ with col_right:
         </div>
         """, unsafe_allow_html=True)
     else:
+        # Studio name inputs (only show for studio_print)
+        if tpl_key == "studio_print":
+            scol1, scol2 = st.columns(2)
+            with scol1:
+                sn = st.text_input("🏪 Nama Studio", value=st.session_state.studio_name,
+                                   key="studio_name_input", max_chars=30)
+                st.session_state.studio_name = sn
+            with scol2:
+                ss = st.text_input("📝 Tagline", value=st.session_state.studio_sub,
+                                   key="studio_sub_input", max_chars=40)
+                st.session_state.studio_sub = ss
+
         with st.spinner("⚙️ Membuat layout..."):
-            sheet = build_sheet(st.session_state.photo, tpl, current_filter)
+            if tpl_key == "studio_print":
+                sheet = build_studio_sheet(
+                    st.session_state.photo, tpl, current_filter,
+                    st.session_state.studio_name,
+                    st.session_state.studio_sub,
+                )
+            else:
+                sheet = build_sheet(st.session_state.photo, tpl, current_filter)
             thumb = preview_thumbnail(sheet, max_px=700)
 
         # Before/After toggle
         show_before = st.toggle("👁️ Lihat tanpa filter (before/after)", value=False)
 
         if show_before:
-            sheet_before = build_sheet(st.session_state.photo, tpl, "normal")
+            if tpl_key == "studio_print":
+                sheet_before = build_studio_sheet(
+                    st.session_state.photo, tpl, "normal",
+                    st.session_state.studio_name, st.session_state.studio_sub)
+            else:
+                sheet_before = build_sheet(st.session_state.photo, tpl, "normal")
             thumb_before = preview_thumbnail(sheet_before, max_px=700)
             bcol1, bcol2 = st.columns(2)
             with bcol1:
