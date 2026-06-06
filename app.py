@@ -1244,10 +1244,10 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
   justify-content:center; align-items:center;
 }
 #captureBtn {
-  background:#f5c518; color:#000; border:none; border-radius:12px;
-  width:auto; padding:0 22px; height:56px; font-size:16px; cursor:pointer; font-weight:bold;
+  background:#f5c518; color:#000; border:none; border-radius:50%;
+  width:64px; height:64px; font-size:15px; cursor:pointer; font-weight:bold;
   box-shadow:0 0 0 4px #333; transition:transform 0.1s;
-  flex-shrink:0; letter-spacing:1px;
+  flex-shrink:0;
 }
 #captureBtn:active { transform:scale(0.88); }
 .tbtn {
@@ -1290,7 +1290,10 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 
 <div id="controls">
   <button class="tbtn on" id="autoBtn" onclick="toggleAuto()">🤏 Auto Snap</button>
-  <button id="captureBtn" onclick="startCapture()">📸 AMBIL FOTO</button>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+    <button id="captureBtn" onclick="startCapture()">📸</button>
+    <span style="font-size:10px;color:#f5c518;font-weight:bold;letter-spacing:1px;">AMBIL FOTO</span>
+  </div>
   <button class="tbtn" id="timerBtn" onclick="toggleTimer()">⏱️ Timer 3s</button>
 </div>
 <div id="status">Memulai kamera...</div>
