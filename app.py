@@ -1210,7 +1210,6 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 #video {
   width:100%; display:block; border-radius:10px;
   transform:scaleX(-1);
-  max-height:52vh; object-fit:cover;
 }
 /* Motion indicator bar */
 #motionBar {
@@ -1736,30 +1735,32 @@ with tab_foto:
         lsz = st.session_state.watermark_logo_size
         opac = st.session_state.watermark_opacity
 
-    st.divider()
-    st.markdown("### 3. Pilih Template" if st.session_state.photo else "### 2. Pilih Template")
-
-    tpl_keys = list(TEMPLATES.keys())
-    for i in range(0, len(tpl_keys), 2):
-        c1, c2 = st.columns(2)
-        for j, col in enumerate([c1, c2]):
-            if i + j < len(tpl_keys):
-                key = tpl_keys[i + j]
-                tpl = TEMPLATES[key]
-                selected = st.session_state.selected_tpl == key
-                with col:
-                    if st.button(
-                        f"{tpl['icon']} {tpl['name']}\n{tpl['desc']}",
-                        key=f"tpl_{key}",
-                        use_container_width=True,
-                        type="primary" if selected else "secondary",
-                    ):
-                        st.session_state.selected_tpl = key
-                        st.rerun()
-
 # ── TAB 2: Preview + Download ───────────────────────────────────────────────────
 with tab_edit:
-    st.markdown("### 4. Preview & Download" if st.session_state.photo else "### 3. Preview & Download")
+    st.markdown("### Edit & Download")
+
+    # ── Template Picker di tab edit ───────────────────────────────────────────
+    if st.session_state.photo is not None:
+        st.markdown("#### 🖼️ Pilih Template")
+        tpl_keys = list(TEMPLATES.keys())
+        for i in range(0, len(tpl_keys), 2):
+            c1, c2 = st.columns(2)
+            for j, col in enumerate([c1, c2]):
+                if i + j < len(tpl_keys):
+                    key = tpl_keys[i + j]
+                    t = TEMPLATES[key]
+                    selected = st.session_state.selected_tpl == key
+                    with col:
+                        if st.button(
+                            f"{t['icon']} {t['name']}",
+                            key=f"tpl_{key}",
+                            use_container_width=True,
+                            type="primary" if selected else "secondary",
+                            help=t['desc'],
+                        ):
+                            st.session_state.selected_tpl = key
+                        st.caption(t['desc'])
+        st.divider()
 
     # Debug info (hapus setelah stabil)
     if st.session_state.get("debug_mode"):
