@@ -1298,6 +1298,11 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
   <button class="tbtn" id="timerBtn" onclick="toggleTimer()">⏱️ Timer 3s</button>
 </div>
 <div id="status">Memulai kamera...</div>
+<div id="gesture-hint" style="text-align:center;margin-top:6px;font-size:12px;color:#888;line-height:1.6;">
+  🫰 <b style="color:#f5c518;">Snap otomatis:</b> Gerakkan tangan di depan kamera<br>
+  ✌️ Atau tekan tombol <b style="color:#f5c518;">📸 AMBIL FOTO</b> di atas<br>
+  ⏱️ Aktifkan <b style="color:#aaa;">Timer 3s</b> buat bersiap dulu
+</div>
 
 <div id="previewBox">
   <p id="savedMsg">✅ Foto tersimpan otomatis!</p>
@@ -1552,10 +1557,10 @@ tab_photobooth, tab_collage, tab_support = st.tabs(["📸 Photo Booth", "🖼️
 with tab_photobooth:
  st.markdown("*Ambil foto → Pilih tema → Pilih template → Download PDF / JPG*")
 
- col_left, col_right = st.columns([1, 1.4], gap="large")
+ tab_foto, tab_edit = st.tabs(["📷 1. Ambil Foto", "🎨 2. Edit & Download"])
 
-# ── LEFT: Foto input + Filter + Template picker ───────────────────────────────
-with col_left:
+# ── TAB 1: Foto input + Filter + Template picker ──────────────────────────────
+with tab_foto:
     st.markdown("### 1. Ambil / Upload Foto")
 
     input_mode = st.radio("Sumber foto", ["📷 Webcam", "📁 Upload File"], horizontal=True, label_visibility="collapsed")
@@ -1590,28 +1595,43 @@ with col_left:
         </script>
         """, height=0)
 
-        # Bridge textarea disembunyikan via CSS — tetap berfungsi tapi tidak keliatan
-        st.markdown("""
-        <style>
-        [data-testid="stTextArea"]:has(textarea[aria-label="cam_bridge_ta"]) {
-            position: absolute; opacity: 0; pointer-events: none;
-            width: 1px; height: 1px; overflow: hidden;
+        # ── Bridge: iframe kamera → Streamlit session state ─────────────────
+        # Textarea hidden via CSS, JS inject dataURL ke sini
+        st.markdown("""<style>
+        div[data-testid="stTextArea"]:has(> label > div > textarea[aria-label="cam_bridge_ta"]),
+        div[data-testid="stTextArea"]:has(textarea[aria-label="cam_bridge_ta"]) {
+            position:fixed!important; left:-9999px!important; opacity:0!important;
+            width:1px!important; height:1px!important; overflow:hidden!important;
+            pointer-events:none!important;
         }
-        </style>
-        """, unsafe_allow_html=True)
+        </style>""", unsafe_allow_html=True)
+
         raw_b64 = st.text_area("cam_bridge_ta", key="cam_bridge_ta",
-                                label_visibility="collapsed", height=1)
-        if raw_b64 and raw_b64.strip().startswith("data:image") and not st.session_state.get("_photo_just_saved"):
+                               label_visibility="collapsed", height=1)
+
+        # Proses foto dari kamera
+        if (raw_b64
+                and isinstance(raw_b64, str)
+                and raw_b64.strip().startswith("data:image")
+                and not st.session_state.get("_photo_just_saved")):
             try:
-                header, b64data = raw_b64.strip().split(",", 1)
+                _, b64data = raw_b64.strip().split(",", 1)
                 img_bytes = base64.b64decode(b64data)
-                st.session_state.photo = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                st.session_state.photo = img
                 st.session_state["_photo_just_saved"] = True
+                st.session_state["_goto_edit"] = True
             except Exception as e:
-                st.warning(f"Gagal proses foto: {e}")
+                st.error(f"❌ Gagal proses foto: {e}")
             st.rerun()
-        elif not (raw_b64 and raw_b64.strip().startswith("data:image")):
+
+        if not (raw_b64 and isinstance(raw_b64, str) and raw_b64.strip().startswith("data:image")):
             st.session_state["_photo_just_saved"] = False
+
+        # Setelah foto tersimpan, tampilkan preview + panduan
+        if st.session_state.photo is not None:
+            st.success("✅ Foto berhasil! Tap tab **🎨 2. Edit & Download** di atas untuk lanjut.")
+            st.image(st.session_state.photo, width=160, caption="Foto terakhir")
     else:
         uploaded = st.file_uploader(
             "Upload foto (JPG, PNG)",
@@ -1737,11 +1757,19 @@ with col_left:
                         st.session_state.selected_tpl = key
                         st.rerun()
 
-# ── RIGHT: Preview + Download ──────────────────────────────────────────────────
-with col_right:
+# ── TAB 2: Preview + Download ───────────────────────────────────────────────────
+with tab_edit:
     st.markdown("### 4. Preview & Download" if st.session_state.photo else "### 3. Preview & Download")
 
-    tpl_key = st.session_state.selected_tpl
+    # Debug info (hapus setelah stabil)
+    if st.session_state.get("debug_mode"):
+        st.caption(f"photo={st.session_state.photo is not None} | tpl={st.session_state.selected_tpl} | filter={st.session_state.selected_filter}")
+
+    # Fallback kalau selected_tpl tidak valid
+    tpl_key = st.session_state.get("selected_tpl", list(TEMPLATES.keys())[0])
+    if tpl_key not in TEMPLATES:
+        tpl_key = list(TEMPLATES.keys())[0]
+        st.session_state.selected_tpl = tpl_key
     tpl = TEMPLATES[tpl_key]
     current_filter = st.session_state.selected_filter
     active_f = FILTERS[current_filter]
