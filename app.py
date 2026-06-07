@@ -1210,6 +1210,7 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 #video {
   width:100%; display:block; border-radius:10px;
   transform:scaleX(-1);
+  max-height:52vh; object-fit:cover;
 }
 /* Motion indicator bar */
 #motionBar {
@@ -1240,7 +1241,7 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 }
 /* Controls */
 #controls {
-  display:flex; gap:8px; margin-top:8px;
+  display:flex; gap:8px; margin-top:6px;
   justify-content:center; align-items:center;
 }
 #captureBtn {
@@ -1258,7 +1259,7 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 /* Status */
 #status {
   text-align:center; font-size:12px; color:#888;
-  margin-top:5px; min-height:18px; letter-spacing:0.4px;
+  margin-top:3px; min-height:16px; letter-spacing:0.4px;
 }
 /* Preview */
 #previewBox {
@@ -1284,8 +1285,8 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 </div>
 
 <div id="motionBar"><div id="motionFill"></div></div>
-<div id="motionLabel" style="text-align:center;font-size:11px;color:#666;margin:2px 0 6px;">
-  Motion detector — gerak = auto snap
+<div id="motionLabel" style="text-align:center;font-size:10px;color:#555;margin:1px 0 4px;">
+  gerak = auto snap
 </div>
 
 <div id="controls">
@@ -1561,7 +1562,7 @@ with col_left:
 
     if input_mode == "📷 Webcam":
         # ── AR Camera preview ─────────────────────────────────────────────────
-        components.html(get_ar_camera_html(), height=620, scrolling=False)
+        components.html(get_ar_camera_html(), height=760, scrolling=False)
 
         # ── JS bridge: receive postMessage from AR iframe ─────────────────────
         # Uses a reliable relay: AR iframe → parent postMessage →
@@ -2324,15 +2325,19 @@ if st.button("👉 Klik bentar, Zah..."):
     st.write("")
     
     # 3. Tampilkan Kalimat Polos Cerita Lu
-    st.write("Zah, di atas itu bukti obrolan gua sama Pak Ageng (Recruiter HTC Global Services). Gua sengaja pajang di sini biar lu tahu semuanya secara terbuka. Gua rela ngambil langkah sejauh ini, nembus tantangan baru ke Jakarta, karena gua pengen nyari finansial yang lebih baik. Gua pengen berjuang di tempat yang bener-bener ngehargai hasil kerja keras gua.")
+    st.write("Zah, di atas itu bukti obrolan gua sama Pak Ageng (Recruiter HTC Global Services). Gua sengaja pajang di sini biar lu tahu semuanya.")
     
-    st.write("Tapi dari skrip ini gua mau lu tahu, lu gak usah khawatir, gua gabakal lupain lu, Zah. Gua kagum banget sama lu. Lu itu wanita mandiri, tipe cewek yang susah buat dideketin, dan jujur... cewek kayak lu yang emang gua cari selama ini.")
+    st.write("Kemarin gua dapet panggilan interview di Jakarta. Udah gua siapin semuanya — termasuk script photo booth ini, buat ngerayain kalau goals.")
     
-    st.write("Sekarang bukannya gua menghilang atau ngejauh. Tapi setiap kali lu bales DM gua, gua sengaja mikir berkali-kali dulu mau bales apa. Biar apa? Biar lu gak marah, dan biar obrolan kita tuh bisa nambah asik ke depannya.")
+    st.write("Tapi situasi di rumah lagi nggak kondusif buat gua pergi. Jadi ya... gagal berangkat.")
+    
+    st.write("Nggak tau kenapa pengen cerita ke lu juga. Mungkin karena tanpa lu sadar, lu udah ngaruh ke hidup gua lebih dari yang lu kira.")
+    
+    st.write("Serius. Dari postingan lu di TikTok — yang bahkan bukan buat gua — gua bisa distract, baru kali ini gua ngerasa nggak terpaksa buat berubah. Gua putus sama kebiasaan lama, bukan karena disuruh, tapi karena lu tanpa sadar kasih alasan yang lebih kuat.")
     
     # Bagian cerita apes yang udah disinkronkan:
-    st.write("Inget masalah kemarin? Apesnya lu gara-gara salah transfer, eh apesnya gua juga pas ngirim matcha malah nyangkut ditahan di security wkwk. Gara-gara drama sama-sama apes itu, gua mikir... emang kita kayaknya gabisa dipisah-pisahin, Zah. ❤️")
+    st.write("Inget masalah kemarin? Apesnya lu gara-gara salah transfer, apesnya gua juga pas ngirim matcha malah nyangkut di security wkwk. Gara-gara drama sama-sama apes itu, gua mikir... emang kita kayaknya gabisa dipisah-pisahin, Zah. ❤️")
     
-    st.write("Nanti gua di Jakarta sendirian, tapi entah kenapa di pikiran gua nama lu terus yang lewat. Nomor gua masih sama kok, aktif terus 24 jam. Jadi kalau lu mau ninggalin pesan di aplikasi ini atau mau ngabarin langsung, pintu gua selalu kebuka. Tenang aja, urusan matcha yang gagal kemarin tetep bakal gua ganti dan kirim lagi nanti, ntar gua DM lu lagi ya, wkwk.")
+    st.write("Nomor gua masih sama, aktif terus 24 jam. Kalau lu mau ninggalin pesan di sini atau ngabarin langsung, pintu gua selalu kebuka. Urusan matcha yang gagal kemarin tetep bakal gua ganti — ntar gua DM lu lagi ya, wkwk.")
     
-    st.write("Doain gua ya, kalo masih ada kesempatan gua bakal prioritasin lu jadi nomor satu, tapi kalo bukan lu gua berdoa semoga yang gak itu tetap lu wkwkw")
+    st.write("Doain gua ya. Kalau masih ada kesempatan, gua bakal prioritasin lu jadi nomor satu — tapi kalau bukan lu, gua tetap berdoa semoga yang itu lu juga. wkwkw")
