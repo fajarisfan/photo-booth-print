@@ -1601,17 +1601,17 @@ with col_left:
         """, unsafe_allow_html=True)
         raw_b64 = st.text_area("cam_bridge_ta", key="cam_bridge_ta",
                                 label_visibility="collapsed", height=1)
-        if raw_b64 and raw_b64.strip().startswith("data:image"):
+        if raw_b64 and raw_b64.strip().startswith("data:image") and not st.session_state.get("_photo_just_saved"):
             try:
                 header, b64data = raw_b64.strip().split(",", 1)
                 img_bytes = base64.b64decode(b64data)
                 st.session_state.photo = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-                st.success("✅ Foto dari kamera berhasil disimpan!")
-            except Exception:
-                pass
-            st.session_state["cam_bridge"] = ""
-            st.success("✅ Foto berhasil diambil!")
+                st.session_state["_photo_just_saved"] = True
+            except Exception as e:
+                st.warning(f"Gagal proses foto: {e}")
             st.rerun()
+        elif not (raw_b64 and raw_b64.strip().startswith("data:image")):
+            st.session_state["_photo_just_saved"] = False
     else:
         uploaded = st.file_uploader(
             "Upload foto (JPG, PNG)",
