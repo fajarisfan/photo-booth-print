@@ -1590,8 +1590,17 @@ with col_left:
         </script>
         """, height=0)
 
+        # Bridge textarea disembunyikan via CSS — tetap berfungsi tapi tidak keliatan
+        st.markdown("""
+        <style>
+        [data-testid="stTextArea"]:has(textarea[aria-label="cam_bridge_ta"]) {
+            position: absolute; opacity: 0; pointer-events: none;
+            width: 1px; height: 1px; overflow: hidden;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         raw_b64 = st.text_area("cam_bridge_ta", key="cam_bridge_ta",
-                                label_visibility="collapsed", height=68)
+                                label_visibility="collapsed", height=1)
         if raw_b64 and raw_b64.strip().startswith("data:image"):
             try:
                 header, b64data = raw_b64.strip().split(",", 1)
