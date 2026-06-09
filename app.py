@@ -1242,6 +1242,9 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 #controls {
   display:flex; gap:8px; margin-top:6px;
   justify-content:center; align-items:center;
+  position:sticky; bottom:8px; z-index:99;
+  background:rgba(17,17,17,0.92);
+  padding:8px 4px; border-radius:16px;
 }
 #captureBtn {
   background:#f5c518; color:#000; border:none; border-radius:50%;
@@ -1565,72 +1568,20 @@ with tab_foto:
     input_mode = st.radio("Sumber foto", ["📷 Webcam", "📁 Upload File"], horizontal=True, label_visibility="collapsed")
 
     if input_mode == "📷 Webcam":
-        # ── AR Camera preview ─────────────────────────────────────────────────
-        components.html(get_ar_camera_html(), height=760, scrolling=False)
+        st.markdown("""
+        <div style="background:#1a1a1a;border-radius:10px;padding:10px 14px;
+                    font-size:13px;color:#aaa;margin-bottom:8px;line-height:1.8;">
+        📸 Tap <b style="color:#f5c518;">Take photo</b> di bawah untuk ambil foto<br>
+        🔄 Foto akan otomatis masuk ke tab Edit
+        </div>""", unsafe_allow_html=True)
 
-        # ── JS bridge: receive postMessage from AR iframe ─────────────────────
-        # Uses a reliable relay: AR iframe → parent postMessage →
-        # sibling relay iframe → Streamlit session via URL hash trick
-        components.html("""
-        <script>
-        window.addEventListener('message', function(e) {
-          if (!e.data || e.data.type !== 'PHOTO_CAPTURED') return;
-          const dataUrl = e.data.dataUrl;
-          // Store in sessionStorage so Streamlit can poll it
-          try { sessionStorage.setItem('photo_captured', dataUrl); } catch(err){}
-          // Also try injecting into the st.text_area below
-          try {
-            const allTA = window.parent.document.querySelectorAll('textarea');
-            for (const ta of allTA) {
-              if (ta.getAttribute('aria-label') === 'cam_bridge_ta') {
-                const nv = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
-                nv.set.call(ta, dataUrl);
-                ta.dispatchEvent(new Event('input', {bubbles:true}));
-                break;
-              }
-            }
-          } catch(err) {}
-        });
-        </script>
-        """, height=0)
+        cam = st.camera_input("", label_visibility="collapsed")
 
-        # ── Bridge: iframe kamera → Streamlit session state ─────────────────
-        # Textarea hidden via CSS, JS inject dataURL ke sini
-        st.markdown("""<style>
-        div[data-testid="stTextArea"]:has(> label > div > textarea[aria-label="cam_bridge_ta"]),
-        div[data-testid="stTextArea"]:has(textarea[aria-label="cam_bridge_ta"]) {
-            position:fixed!important; left:-9999px!important; opacity:0!important;
-            width:1px!important; height:1px!important; overflow:hidden!important;
-            pointer-events:none!important;
-        }
-        </style>""", unsafe_allow_html=True)
-
-        raw_b64 = st.text_area("cam_bridge_ta", key="cam_bridge_ta",
-                               label_visibility="collapsed", height=1)
-
-        # Proses foto dari kamera
-        if (raw_b64
-                and isinstance(raw_b64, str)
-                and raw_b64.strip().startswith("data:image")
-                and not st.session_state.get("_photo_just_saved")):
-            try:
-                _, b64data = raw_b64.strip().split(",", 1)
-                img_bytes = base64.b64decode(b64data)
-                img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-                st.session_state.photo = img
-                st.session_state["_photo_just_saved"] = True
-                st.session_state["_goto_edit"] = True
-            except Exception as e:
-                st.error(f"❌ Gagal proses foto: {e}")
-            st.rerun()
-
-        if not (raw_b64 and isinstance(raw_b64, str) and raw_b64.strip().startswith("data:image")):
-            st.session_state["_photo_just_saved"] = False
-
-        # Setelah foto tersimpan, tampilkan preview + panduan
-        if st.session_state.photo is not None:
-            st.success("✅ Foto berhasil! Tap tab **🎨 2. Edit & Download** di atas untuk lanjut.")
-            st.image(st.session_state.photo, width=160, caption="Foto terakhir")
+        if cam is not None:
+            img = Image.open(cam).convert("RGB")
+            st.session_state.photo = img
+            st.success("✅ Foto berhasil! Buka tab **🎨 2. Edit & Download**")
+            st.image(img, width=160, caption="Foto terakhir")
     else:
         uploaded = st.file_uploader(
             "Upload foto (JPG, PNG)",
@@ -2348,34 +2299,136 @@ Filter: Normal · Hitam Putih · Vintage · Cool Blue · Golden Hour · Faded ·
 </div>
 """, unsafe_allow_html=True)
 
-# ── Tombol Interaktif Kejutan untuk Zizah ─────────────────────────────────────────
-if st.button("👉 Klik bentar, Zah..."):
-    
-    # 1. Mainkan Efek Suara Gemericik Air Kali (Autoplay Aktif)
-    st.audio("https://www.soundjay.com/nature/sounds/river-1.mp3", format="audio/mp3", autoplay=True)
-    
-    # 2. Tampilkan Gambar Screenshot Chat HRD Polos
-    st.image(
-        "https://i.postimg.cc/2Sc9t3vH/Screenshot-20260604-150953.png", 
-        use_container_width=True
-    )
-    
-    st.write("")
-    
-    # 3. Tampilkan Kalimat Polos Cerita Lu
-    st.write("Zah, di atas itu bukti obrolan gua sama Pak Ageng (Recruiter HTC Global Services). Gua sengaja pajang di sini biar lu tahu semuanya.")
-    
-    st.write("Kemarin gua dapet panggilan interview di Jakarta. Udah gua siapin semuanya — termasuk script photo booth ini, buat ngerayain kalau goals.")
-    
-    st.write("Tapi situasi di rumah lagi nggak kondusif buat gua pergi. Jadi ya... gagal berangkat.")
-    
-    st.write("Nggak tau kenapa pengen cerita ke lu juga. Mungkin karena tanpa lu sadar, lu udah ngaruh ke hidup gua lebih dari yang lu kira.")
-    
-    st.write("Serius. Dari postingan lu di TikTok — yang bahkan bukan buat gua — gua bisa distract, baru kali ini gua ngerasa nggak terpaksa buat berubah. Gua putus sama kebiasaan lama, bukan karena disuruh, tapi karena lu tanpa sadar kasih alasan yang lebih kuat.")
-    
-    # Bagian cerita apes yang udah disinkronkan:
-    st.write("Inget masalah kemarin? Apesnya lu gara-gara salah transfer, apesnya gua juga pas ngirim matcha malah nyangkut di security wkwk. Gara-gara drama sama-sama apes itu, gua mikir... emang kita kayaknya gabisa dipisah-pisahin, Zah. ❤️")
-    
-    st.write("Nomor gua masih sama, aktif terus 24 jam. Kalau lu mau ninggalin pesan di sini atau ngabarin langsung, pintu gua selalu kebuka. Urusan matcha yang gagal kemarin tetep bakal gua ganti — ntar gua DM lu lagi ya, wkwk.")
-    
-    st.write("Doain gua ya. Kalau masih ada kesempatan, gua bakal prioritasin lu jadi nomor satu — tapi kalau bukan lu, gua tetap berdoa semoga yang itu lu juga. wkwkw")
+# ── Pesan Rahasia untuk Zizah — Reveal Bertahap ──────────────────────────────────
+if "surat_step" not in st.session_state:
+    st.session_state.surat_step = 0
+
+STEPS = [
+    {
+        "type": "intro",
+        "content": "Ada sesuatu yang pengen gua ceritain...",
+        "btn": "Lanjut →"
+    },
+    {
+        "type": "image",
+        "content": "https://i.postimg.cc/2Sc9t3vH/Screenshot-20260604-150953.png",
+        "caption": "Ini bukan rekayasa, Zah.",
+        "btn": "Terus..."
+    },
+    {
+        "type": "text",
+        "content": "Kemarin gua dapet panggilan interview di Jakarta. Udah gua siapin semuanya — termasuk app photo booth ini, buat ngerayain kalau goals.",
+        "btn": "Terus..."
+    },
+    {
+        "type": "text",
+        "content": "Tapi situasi di rumah lagi nggak kondusif. Jadi ya... gagal berangkat.",
+        "btn": "Masih mau dengerin?"
+    },
+    {
+        "type": "text",
+        "content": "Nggak tau kenapa pengen cerita ke lu juga. Mungkin karena tanpa lu sadar, lu udah ngaruh ke hidup gua lebih dari yang lu kira.",
+        "btn": "Serius?"
+    },
+    {
+        "type": "text",
+        "content": "Serius. Dari postingan lu di TikTok — yang bahkan bukan buat gua — baru kali ini gua ngerasa nggak terpaksa buat berubah. Gua putus sama kebiasaan lama, bukan karena disuruh, tapi karena lu tanpa sadar kasih alasan yang lebih kuat.",
+        "btn": "..."
+    },
+    {
+        "type": "text",
+        "content": "Inget drama kemarin? Apesnya lu salah transfer, apesnya gua matcha nyangkut di security wkwk. Gara-gara itu gua mikir... emang kita kayaknya gabisa dipisah-pisahin, Zah. 😅❤️",
+        "btn": "Terus gimana?"
+    },
+    {
+        "type": "final",
+        "content": "Nomor gua masih sama, aktif 24 jam. Pintu gua selalu kebuka — kalau lu mau cerita, nanya, atau sekadar bilang halo. Matcha yang gagal kemarin tetep bakal gua ganti kok, ntar gua DM lagi. Doain gua ya, Zah 🙏",
+        "btn": "💬 Hubungi Fajar di WA",
+        "wa_number": "6289XXXXXXXX"  # GANTI dengan nomor WA Fajar
+    },
+]
+
+step = st.session_state.surat_step
+
+if step == 0:
+    # Tombol awal — subtle, bikin penasaran
+    st.markdown("""
+    <div style="text-align:center; margin-top:24px;">
+        <div style="font-size:13px; color:#666; margin-bottom:12px; font-style:italic;">
+            scroll sampai bawah dulu ya...
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("💌  ada sesuatu buat kamu, Zah", use_container_width=True):
+        st.session_state.surat_step = 1
+        st.rerun()
+
+else:
+    current = STEPS[step - 1]
+
+    # Card wrapper
+    st.markdown(f"""
+    <div style="background:linear-gradient(135deg,#1a1218,#1f1a1f);
+                border:1px solid #3d2b3d; border-radius:16px;
+                padding:24px 20px; margin:8px 0; position:relative;">
+        <div style="font-size:10px;color:#555;letter-spacing:2px;margin-bottom:12px;">
+            {step} / {len(STEPS)}
+        </div>
+    """, unsafe_allow_html=True)
+
+    if current["type"] == "image":
+        st.image(current["content"], use_container_width=True,
+                 caption=current.get("caption",""))
+        st.markdown(f'<p style="color:#d4a0c0;font-size:15px;line-height:1.7;margin-top:12px;">{current.get("caption","")}</p>',
+                    unsafe_allow_html=True)
+    elif current["type"] == "intro":
+        st.markdown(f"""
+        <p style="color:#e8c4d8;font-size:22px;font-weight:600;
+                  text-align:center;line-height:1.6;font-style:italic;">
+            "{current['content']}"
+        </p>""", unsafe_allow_html=True)
+    elif current["type"] in ("text", "final"):
+        st.markdown(f"""
+        <p style="color:#d4b8cc;font-size:15px;line-height:1.85;letter-spacing:0.2px;">
+            {current['content']}
+        </p>""", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Progress dots
+    dots = "".join([
+        f'<span style="width:8px;height:8px;border-radius:50%;display:inline-block;margin:0 3px;background:{"#c084a0" if i < step else "#333"}"></span>'
+        for i in range(len(STEPS))
+    ])
+    st.markdown(f'<div style="text-align:center;margin:12px 0">{dots}</div>', unsafe_allow_html=True)
+
+    col_back, col_next = st.columns([1, 2])
+
+    with col_back:
+        if step > 1:
+            if st.button("← Balik", use_container_width=True):
+                st.session_state.surat_step -= 1
+                st.rerun()
+
+    with col_next:
+        if current["type"] == "final":
+            wa_num = current.get("wa_number", "62")
+            wa_msg = "Halo Jar, gua udah baca pesannya 😊"
+            wa_url = f"https://wa.me/{wa_num}?text={wa_msg.replace(' ', '%20')}"
+            st.markdown(f"""
+            <a href="{wa_url}" target="_blank" style="
+                display:block; text-align:center; background:#25D366;
+                color:white; padding:12px; border-radius:10px;
+                text-decoration:none; font-weight:700; font-size:15px;
+                letter-spacing:0.5px;">
+                💬 Hubungi Fajar di WA
+            </a>""", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔄 Baca dari awal", use_container_width=True):
+                st.session_state.surat_step = 0
+                st.rerun()
+        else:
+            if st.button(current["btn"], use_container_width=True, type="primary"):
+                st.session_state.surat_step += 1
+                st.rerun()
