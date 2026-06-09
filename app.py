@@ -1557,374 +1557,374 @@ st.divider()
 tab_photobooth, tab_collage, tab_support = st.tabs(["📸 Photo Booth", "🖼️ Collage", "💌 Dukung Developer"])
 
 with tab_photobooth:
- st.markdown("*Ambil foto → Pilih tema → Pilih template → Download PDF / JPG*")
+    st.markdown("*Ambil foto → Pilih tema → Pilih template → Download PDF / JPG*")
 
- tab_foto, tab_edit = st.tabs(["📷 1. Ambil Foto", "🎨 2. Edit & Download"])
+    tab_foto, tab_edit = st.tabs(["📷 1. Ambil Foto", "🎨 2. Edit & Download"])
 
-# ── TAB 1: Foto input + Filter + Template picker ──────────────────────────────
-with tab_foto:
-    st.markdown("### 1. Ambil / Upload Foto")
+    # ── TAB 1: Foto input + Filter + Template picker ───────────────────────
+    with tab_foto:
+        st.markdown("### 1. Ambil / Upload Foto")
 
-    input_mode = st.radio("Sumber foto", ["📷 Webcam", "📁 Upload File"], horizontal=True, label_visibility="collapsed")
+        input_mode = st.radio("Sumber foto", ["📷 Webcam", "📁 Upload File"], horizontal=True, label_visibility="collapsed")
 
-    if input_mode == "📷 Webcam":
-        components.html(get_ar_camera_html(), height=900, scrolling=True)
+        if input_mode == "📷 Webcam":
+            components.html(get_ar_camera_html(), height=900, scrolling=True)
 
-        # Bridge textarea — hidden, nerima dataURL dari iframe kamera
-        st.markdown("""<style>
-        div[data-testid="stTextArea"]:has(textarea[aria-label="cam_bridge_ta"]) {
-            position:fixed!important;left:-9999px!important;
-            opacity:0!important;pointer-events:none!important;
-            width:1px!important;height:1px!important;
-        }
-        </style>""", unsafe_allow_html=True)
+            # Bridge textarea — hidden, nerima dataURL dari iframe kamera
+            st.markdown("""<style>
+            div[data-testid="stTextArea"]:has(textarea[aria-label="cam_bridge_ta"]) {
+                position:fixed!important;left:-9999px!important;
+                opacity:0!important;pointer-events:none!important;
+                width:1px!important;height:1px!important;
+            }
+            </style>""", unsafe_allow_html=True)
 
-        raw_b64 = st.text_area("cam_bridge_ta", key="cam_bridge_ta",
-                               label_visibility="collapsed", height=1)
+            raw_b64 = st.text_area("cam_bridge_ta", key="cam_bridge_ta",
+                                   label_visibility="collapsed", height=1)
 
-        if (raw_b64 and isinstance(raw_b64, str)
-                and raw_b64.strip().startswith("data:image")
-                and not st.session_state.get("_photo_just_saved")):
-            try:
-                _, b64data = raw_b64.strip().split(",", 1)
-                img = Image.open(io.BytesIO(base64.b64decode(b64data))).convert("RGB")
-                st.session_state.photo = img
-                st.session_state["_photo_just_saved"] = True
-            except Exception as e:
-                st.error(f"❌ Gagal: {e}")
-            st.rerun()
+            if (raw_b64 and isinstance(raw_b64, str)
+                    and raw_b64.strip().startswith("data:image")
+                    and not st.session_state.get("_photo_just_saved")):
+                try:
+                    _, b64data = raw_b64.strip().split(",", 1)
+                    img = Image.open(io.BytesIO(base64.b64decode(b64data))).convert("RGB")
+                    st.session_state.photo = img
+                    st.session_state["_photo_just_saved"] = True
+                except Exception as e:
+                    st.error(f"❌ Gagal: {e}")
+                st.rerun()
 
-        if not (raw_b64 and isinstance(raw_b64, str) and raw_b64.strip().startswith("data:image")):
-            st.session_state["_photo_just_saved"] = False
+            if not (raw_b64 and isinstance(raw_b64, str) and raw_b64.strip().startswith("data:image")):
+                st.session_state["_photo_just_saved"] = False
 
+            if st.session_state.photo is not None:
+                st.success("✅ Foto berhasil! Buka tab **🎨 2. Edit & Download**")
+                st.image(st.session_state.photo, width=160)
+        else:
+            uploaded = st.file_uploader(
+                "Upload foto (JPG, PNG)",
+                type=["jpg", "jpeg", "png", "webp"],
+                label_visibility="visible",
+            )
+            if uploaded:
+                # File upload: tidak perlu mirror, sudah benar orientasinya
+                st.session_state.photo = Image.open(uploaded)
+                st.success("✅ Foto berhasil diupload!")
+
+        if st.session_state.photo:
+            with st.expander("👁️ Lihat foto asli", expanded=False):
+                st.image(st.session_state.photo, use_container_width=True)
+
+        # ── FILTER / TEMA PICKER ─────────────────────────────────────────────────
         if st.session_state.photo is not None:
-            st.success("✅ Foto berhasil! Buka tab **🎨 2. Edit & Download**")
-            st.image(st.session_state.photo, width=160)
-    else:
-        uploaded = st.file_uploader(
-            "Upload foto (JPG, PNG)",
-            type=["jpg", "jpeg", "png", "webp"],
-            label_visibility="visible",
-        )
-        if uploaded:
-            # File upload: tidak perlu mirror, sudah benar orientasinya
-            st.session_state.photo = Image.open(uploaded)
-            st.success("✅ Foto berhasil diupload!")
+            st.divider()
+            st.markdown("### 2. Pilih Tema / Filter")
 
-    if st.session_state.photo:
-        with st.expander("👁️ Lihat foto asli", expanded=False):
-            st.image(st.session_state.photo, use_container_width=True)
+            photo = st.session_state.photo
+            current_filter = st.session_state.selected_filter
+            filter_keys = list(FILTERS.keys())
 
-    # ── FILTER / TEMA PICKER ─────────────────────────────────────────────────
-    if st.session_state.photo is not None:
+            # Tampilkan thumbnail grid per 4 kolom
+            THUMB_COLS = 4
+            for row_start in range(0, len(filter_keys), THUMB_COLS):
+                row_keys = filter_keys[row_start : row_start + THUMB_COLS]
+                cols_thumb = st.columns(THUMB_COLS)
+                for i, fkey in enumerate(row_keys):
+                    fdata = FILTERS[fkey]
+                    is_active = (current_filter == fkey)
+                    thumb = make_filter_thumb(photo, fkey, size=100)
+
+                    with cols_thumb[i]:
+                        st.image(thumb, use_container_width=True)
+                        if st.button(
+                            f"{fdata['icon']}",
+                            key=f"filter_{fkey}",
+                            use_container_width=True,
+                            type="primary" if is_active else "secondary",
+                            help=f"{fdata['name']} — {fdata['desc']}",
+                        ):
+                            st.session_state.selected_filter = fkey
+                            st.rerun()
+                        label_html = f'<div class="{"filter-active" if is_active else "filter-label"}">{fdata["name"]}</div>'
+                        st.markdown(label_html, unsafe_allow_html=True)
+
+            # Show active filter info
+            active_f = FILTERS[current_filter]
+            st.markdown(f"""
+            <div class="info-box">
+            Filter aktif: <b>{active_f['icon']} {active_f['name']}</b> — {active_f['desc']}
+            </div>
+            """, unsafe_allow_html=True)
+
         st.divider()
-        st.markdown("### 2. Pilih Tema / Filter")
+        st.markdown("### 🏷️ Watermark & Logo")
 
-        photo = st.session_state.photo
+        wm_col1, wm_col2 = st.columns([1, 1])
+        with wm_col1:
+            wm = st.text_input(
+                "Teks watermark (opsional)",
+                value=st.session_state.watermark_name,
+                key="wm_input", max_chars=30,
+                placeholder="contoh: Zizah Studio",
+            )
+            st.session_state.watermark_name = wm
+        with wm_col2:
+            wm_pos = st.selectbox(
+                "Posisi",
+                list(WATERMARK_POSITIONS.keys()),
+                index=list(WATERMARK_POSITIONS.keys()).index(st.session_state.watermark_position),
+                key="wm_pos_sel",
+            )
+            st.session_state.watermark_position = wm_pos
+
+        wm_logo_file = st.file_uploader(
+            "Upload Logo (PNG transparan lebih bagus)",
+            type=["png", "jpg", "jpeg", "webp"],
+            key="wm_logo_upload",
+        )
+        if wm_logo_file:
+            st.session_state.watermark_logo = Image.open(wm_logo_file).convert("RGBA")
+            st.success("✅ Logo terupload!")
+
+        if st.session_state.watermark_logo is not None:
+            wm_preview_col, wm_ctrl_col = st.columns([1, 2])
+            with wm_preview_col:
+                st.image(st.session_state.watermark_logo, width=80, caption="Logo preview")
+            with wm_ctrl_col:
+                lsz = st.slider("Ukuran logo (%)", 5, 30,
+                                st.session_state.watermark_logo_size, key="wm_logo_size")
+                st.session_state.watermark_logo_size = lsz
+                opac = st.slider("Opacity (0=transparan, 255=solid)",
+                                 50, 255, st.session_state.watermark_opacity, key="wm_opacity")
+                st.session_state.watermark_opacity = opac
+            if st.button("🗑️ Hapus Logo", key="wm_logo_del"):
+                st.session_state.watermark_logo = None
+                st.rerun()
+        else:
+            lsz = st.session_state.watermark_logo_size
+            opac = st.session_state.watermark_opacity
+
+    with tab_edit:
+        st.markdown("### Edit & Download")
+
+        # ── Template Picker di tab edit ───────────────────────────────────────────
+        if st.session_state.photo is not None:
+            st.markdown("#### 🖼️ Pilih Template")
+            tpl_keys = list(TEMPLATES.keys())
+            for i in range(0, len(tpl_keys), 2):
+                c1, c2 = st.columns(2)
+                for j, col in enumerate([c1, c2]):
+                    if i + j < len(tpl_keys):
+                        key = tpl_keys[i + j]
+                        t = TEMPLATES[key]
+                        selected = st.session_state.selected_tpl == key
+                        with col:
+                            if st.button(
+                                f"{t['icon']} {t['name']}",
+                                key=f"tpl_{key}",
+                                use_container_width=True,
+                                type="primary" if selected else "secondary",
+                                help=t['desc'],
+                            ):
+                                st.session_state.selected_tpl = key
+                                st.rerun()
+                            st.caption(t['desc'])
+            st.divider()
+
+        # Debug info (hapus setelah stabil)
+        if st.session_state.get("debug_mode"):
+            st.caption(f"photo={st.session_state.photo is not None} | tpl={st.session_state.selected_tpl} | filter={st.session_state.selected_filter}")
+
+        # Fallback kalau selected_tpl tidak valid
+        tpl_key = st.session_state.get("selected_tpl", list(TEMPLATES.keys())[0])
+        if tpl_key not in TEMPLATES:
+            tpl_key = list(TEMPLATES.keys())[0]
+            st.session_state.selected_tpl = tpl_key
+        tpl = TEMPLATES[tpl_key]
         current_filter = st.session_state.selected_filter
-        filter_keys = list(FILTERS.keys())
-
-        # Tampilkan thumbnail grid per 4 kolom
-        THUMB_COLS = 4
-        for row_start in range(0, len(filter_keys), THUMB_COLS):
-            row_keys = filter_keys[row_start : row_start + THUMB_COLS]
-            cols_thumb = st.columns(THUMB_COLS)
-            for i, fkey in enumerate(row_keys):
-                fdata = FILTERS[fkey]
-                is_active = (current_filter == fkey)
-                thumb = make_filter_thumb(photo, fkey, size=100)
-
-                with cols_thumb[i]:
-                    st.image(thumb, use_container_width=True)
-                    if st.button(
-                        f"{fdata['icon']}",
-                        key=f"filter_{fkey}",
-                        use_container_width=True,
-                        type="primary" if is_active else "secondary",
-                        help=f"{fdata['name']} — {fdata['desc']}",
-                    ):
-                        st.session_state.selected_filter = fkey
-                        st.rerun()
-                    label_html = f'<div class="{"filter-active" if is_active else "filter-label"}">{fdata["name"]}</div>'
-                    st.markdown(label_html, unsafe_allow_html=True)
-
-        # Show active filter info
         active_f = FILTERS[current_filter]
+
         st.markdown(f"""
         <div class="info-box">
-        Filter aktif: <b>{active_f['icon']} {active_f['name']}</b> — {active_f['desc']}
+        <b>{tpl['icon']} {tpl['name']}</b> &nbsp;|&nbsp;
+        Ukuran foto: <b>{tpl['w']}×{tpl['h']} cm</b> &nbsp;|&nbsp;
+        Susunan: <b>{tpl['cols']}×{tpl['rows']}</b> &nbsp;|&nbsp;
+        Tema: <b>{active_f['icon']} {active_f['name']}</b>
         </div>
         """, unsafe_allow_html=True)
 
-    st.divider()
-    st.markdown("### 🏷️ Watermark & Logo")
-
-    wm_col1, wm_col2 = st.columns([1, 1])
-    with wm_col1:
-        wm = st.text_input(
-            "Teks watermark (opsional)",
-            value=st.session_state.watermark_name,
-            key="wm_input", max_chars=30,
-            placeholder="contoh: Zizah Studio",
-        )
-        st.session_state.watermark_name = wm
-    with wm_col2:
-        wm_pos = st.selectbox(
-            "Posisi",
-            list(WATERMARK_POSITIONS.keys()),
-            index=list(WATERMARK_POSITIONS.keys()).index(st.session_state.watermark_position),
-            key="wm_pos_sel",
-        )
-        st.session_state.watermark_position = wm_pos
-
-    wm_logo_file = st.file_uploader(
-        "Upload Logo (PNG transparan lebih bagus)",
-        type=["png", "jpg", "jpeg", "webp"],
-        key="wm_logo_upload",
-    )
-    if wm_logo_file:
-        st.session_state.watermark_logo = Image.open(wm_logo_file).convert("RGBA")
-        st.success("✅ Logo terupload!")
-
-    if st.session_state.watermark_logo is not None:
-        wm_preview_col, wm_ctrl_col = st.columns([1, 2])
-        with wm_preview_col:
-            st.image(st.session_state.watermark_logo, width=80, caption="Logo preview")
-        with wm_ctrl_col:
-            lsz = st.slider("Ukuran logo (%)", 5, 30,
-                            st.session_state.watermark_logo_size, key="wm_logo_size")
-            st.session_state.watermark_logo_size = lsz
-            opac = st.slider("Opacity (0=transparan, 255=solid)",
-                             50, 255, st.session_state.watermark_opacity, key="wm_opacity")
-            st.session_state.watermark_opacity = opac
-        if st.button("🗑️ Hapus Logo", key="wm_logo_del"):
-            st.session_state.watermark_logo = None
-            st.rerun()
-    else:
-        lsz = st.session_state.watermark_logo_size
-        opac = st.session_state.watermark_opacity
-
-# ── TAB 2: Preview + Download ───────────────────────────────────────────────────
-with tab_edit:
-    st.markdown("### Edit & Download")
-
-    # ── Template Picker di tab edit ───────────────────────────────────────────
-    if st.session_state.photo is not None:
-        st.markdown("#### 🖼️ Pilih Template")
-        tpl_keys = list(TEMPLATES.keys())
-        for i in range(0, len(tpl_keys), 2):
-            c1, c2 = st.columns(2)
-            for j, col in enumerate([c1, c2]):
-                if i + j < len(tpl_keys):
-                    key = tpl_keys[i + j]
-                    t = TEMPLATES[key]
-                    selected = st.session_state.selected_tpl == key
-                    with col:
-                        if st.button(
-                            f"{t['icon']} {t['name']}",
-                            key=f"tpl_{key}",
-                            use_container_width=True,
-                            type="primary" if selected else "secondary",
-                            help=t['desc'],
-                        ):
-                            st.session_state.selected_tpl = key
-                        st.caption(t['desc'])
-        st.divider()
-
-    # Debug info (hapus setelah stabil)
-    if st.session_state.get("debug_mode"):
-        st.caption(f"photo={st.session_state.photo is not None} | tpl={st.session_state.selected_tpl} | filter={st.session_state.selected_filter}")
-
-    # Fallback kalau selected_tpl tidak valid
-    tpl_key = st.session_state.get("selected_tpl", list(TEMPLATES.keys())[0])
-    if tpl_key not in TEMPLATES:
-        tpl_key = list(TEMPLATES.keys())[0]
-        st.session_state.selected_tpl = tpl_key
-    tpl = TEMPLATES[tpl_key]
-    current_filter = st.session_state.selected_filter
-    active_f = FILTERS[current_filter]
-
-    st.markdown(f"""
-    <div class="info-box">
-    <b>{tpl['icon']} {tpl['name']}</b> &nbsp;|&nbsp;
-    Ukuran foto: <b>{tpl['w']}×{tpl['h']} cm</b> &nbsp;|&nbsp;
-    Susunan: <b>{tpl['cols']}×{tpl['rows']}</b> &nbsp;|&nbsp;
-    Tema: <b>{active_f['icon']} {active_f['name']}</b>
-    </div>
-    """, unsafe_allow_html=True)
-
-    if st.session_state.photo is None:
-        st.markdown("""
-        <div style="background:linear-gradient(135deg,#1a1a1a 0%,#222 100%);
-                    border:2px dashed #444; border-radius:16px;
-                    height:360px; display:flex; flex-direction:column;
-                    align-items:center; justify-content:center;
-                    color:#666; font-size:15px; text-align:center; padding:24px;
-                    gap:12px;">
-            <div style="font-size:52px; filter:grayscale(1) opacity(0.4);">📸</div>
-            <div style="color:#f5c518; font-size:20px; font-weight:700;
-                        font-family:'Courier New',monospace; letter-spacing:2px;">
-                SIAP UNTUK FOTO?
+        if st.session_state.photo is None:
+            st.markdown("""
+            <div style="background:linear-gradient(135deg,#1a1a1a 0%,#222 100%);
+                        border:2px dashed #444; border-radius:16px;
+                        height:360px; display:flex; flex-direction:column;
+                        align-items:center; justify-content:center;
+                        color:#666; font-size:15px; text-align:center; padding:24px;
+                        gap:12px;">
+                <div style="font-size:52px; filter:grayscale(1) opacity(0.4);">📸</div>
+                <div style="color:#f5c518; font-size:20px; font-weight:700;
+                            font-family:'Courier New',monospace; letter-spacing:2px;">
+                    SIAP UNTUK FOTO?
+                </div>
+                <div style="color:#888; font-size:13px; line-height:1.7;">
+                    1. Pilih <b style="color:#aaa;">📷 Webcam</b> untuk ambil foto langsung<br>
+                    2. Atau <b style="color:#aaa;">📁 Upload File</b> dari galeri kamu<br>
+                    3. Foto langsung otomatis tersimpan & bisa diedit 🎨
+                </div>
+                <div style="margin-top:8px; background:#f5c518; color:#000;
+                            padding:6px 18px; border-radius:20px; font-size:12px;
+                            font-weight:700; letter-spacing:1px;">
+                    ← PANEL KIRI
+                </div>
             </div>
-            <div style="color:#888; font-size:13px; line-height:1.7;">
-                1. Pilih <b style="color:#aaa;">📷 Webcam</b> untuk ambil foto langsung<br>
-                2. Atau <b style="color:#aaa;">📁 Upload File</b> dari galeri kamu<br>
-                3. Foto langsung otomatis tersimpan & bisa diedit 🎨
-            </div>
-            <div style="margin-top:8px; background:#f5c518; color:#000;
-                        padding:6px 18px; border-radius:20px; font-size:12px;
-                        font-weight:700; letter-spacing:1px;">
-                ← PANEL KIRI
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        # ── Studio Print / Logo custom inputs ─────────────────────────────────
-        if tpl_key == "studio_print":
-            st.markdown("#### 🏷️ Kustomisasi Logo Studio")
-            scol1, scol2 = st.columns(2)
-            with scol1:
-                sn = st.text_input("🏪 Nama Studio", value=st.session_state.studio_name,
-                                   key="studio_name_input", max_chars=30)
-                st.session_state.studio_name = sn
-            with scol2:
-                ss = st.text_input("📝 Tagline", value=st.session_state.studio_sub,
-                                   key="studio_sub_input", max_chars=40)
-                st.session_state.studio_sub = ss
-
-            logo_col1, logo_col2, logo_col3 = st.columns(3)
-            with logo_col1:
-                lf = st.selectbox("🔤 Font Logo", list(LOGO_FONTS.keys()),
-                                  index=list(LOGO_FONTS.keys()).index(st.session_state.logo_font),
-                                  key="logo_font_sel")
-                st.session_state.logo_font = lf
-            with logo_col2:
-                ls = st.selectbox("🔷 Bentuk Badge", list(LOGO_SHAPES.values()),
-                                  key="logo_shape_sel")
-                st.session_state.logo_shape = list(LOGO_SHAPES.keys())[list(LOGO_SHAPES.values()).index(ls)]
-            with logo_col3:
-                st.markdown("**Warna Teks**")
-                ltc = st.color_picker("Warna Teks Logo", value=st.session_state.logo_text_color_hex,
-                                      key="logo_text_color", label_visibility="collapsed")
-                st.session_state.logo_text_color_hex = ltc
-
-            bdc_col1, bdc_col2 = st.columns(2)
-            with bdc_col1:
-                st.markdown("**Warna Badge**")
-                lbc = st.color_picker("Warna Badge", value=st.session_state.logo_badge_color_hex,
-                                      key="logo_badge_color", label_visibility="collapsed")
-                st.session_state.logo_badge_color_hex = lbc
-            with bdc_col2:
-                st.markdown("**Warna Border Badge**")
-                lbrc = st.color_picker("Warna Border", value=st.session_state.logo_border_color_hex,
-                                       key="logo_border_color", label_visibility="collapsed")
-                st.session_state.logo_border_color_hex = lbrc
-
-        def _hex_to_rgb(h):
-            h = h.lstrip("#")
-            return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-
-        with st.spinner("⚙️ Membuat layout..."):
-            if tpl_key == "studio_print":
-                sheet = build_studio_sheet(
-                    st.session_state.photo, tpl, current_filter,
-                    st.session_state.studio_name,
-                    st.session_state.studio_sub,
-                    logo_font=st.session_state.logo_font,
-                    logo_shape=st.session_state.logo_shape,
-                    logo_text_color=_hex_to_rgb(st.session_state.logo_text_color_hex),
-                    logo_badge_color=_hex_to_rgb(st.session_state.logo_badge_color_hex),
-                    logo_border_color=_hex_to_rgb(st.session_state.logo_border_color_hex),
-                )
-            elif tpl["style"].startswith("frame_") or tpl["style"].startswith("romance_"):
-                sheet = build_frame_sheet(st.session_state.photo, tpl, current_filter)
-            else:
-                sheet = build_sheet(st.session_state.photo, tpl, current_filter)
-            thumb = preview_thumbnail(sheet, max_px=700)
-
-        # Before/After toggle
-        show_before = st.toggle("👁️ Lihat tanpa filter (before/after)", value=False)
-
-        if show_before:
-            if tpl_key == "studio_print":
-                sheet_before = build_studio_sheet(
-                    st.session_state.photo, tpl, "normal",
-                    st.session_state.studio_name, st.session_state.studio_sub,
-                    logo_font=st.session_state.logo_font,
-                    logo_shape=st.session_state.logo_shape,
-                    logo_text_color=_hex_to_rgb(st.session_state.logo_text_color_hex),
-                    logo_badge_color=_hex_to_rgb(st.session_state.logo_badge_color_hex),
-                    logo_border_color=_hex_to_rgb(st.session_state.logo_border_color_hex),
-                )
-            elif tpl["style"].startswith("frame_") or tpl["style"].startswith("romance_"):
-                sheet_before = build_frame_sheet(st.session_state.photo, tpl, "normal")
-            else:
-                sheet_before = build_sheet(st.session_state.photo, tpl, "normal")
-            thumb_before = preview_thumbnail(sheet_before, max_px=700)
-            bcol1, bcol2 = st.columns(2)
-            with bcol1:
-                st.markdown('<div class="preview-label">BEFORE (Normal)</div>', unsafe_allow_html=True)
-                st.image(thumb_before, use_container_width=True)
-            with bcol2:
-                st.markdown(f'<div class="preview-label">AFTER ({active_f["name"]})</div>', unsafe_allow_html=True)
-                st.image(thumb, use_container_width=True)
+            """, unsafe_allow_html=True)
         else:
-            st.markdown(f'<div class="preview-label">PREVIEW — {active_f["icon"]} {active_f["name"]}</div>', unsafe_allow_html=True)
-            st.image(thumb, use_container_width=True, caption=f"{tpl['name']} · {active_f['name']} — siap cetak di kertas foto A4")
+            # ── Studio Print / Logo custom inputs ─────────────────────────────────
+            if tpl_key == "studio_print":
+                st.markdown("#### 🏷️ Kustomisasi Logo Studio")
+                scol1, scol2 = st.columns(2)
+                with scol1:
+                    sn = st.text_input("🏪 Nama Studio", value=st.session_state.studio_name,
+                                       key="studio_name_input", max_chars=30)
+                    st.session_state.studio_name = sn
+                with scol2:
+                    ss = st.text_input("📝 Tagline", value=st.session_state.studio_sub,
+                                       key="studio_sub_input", max_chars=40)
+                    st.session_state.studio_sub = ss
 
-        st.divider()
-        st.markdown("### 5. Download")
+                logo_col1, logo_col2, logo_col3 = st.columns(3)
+                with logo_col1:
+                    lf = st.selectbox("🔤 Font Logo", list(LOGO_FONTS.keys()),
+                                      index=list(LOGO_FONTS.keys()).index(st.session_state.logo_font),
+                                      key="logo_font_sel")
+                    st.session_state.logo_font = lf
+                with logo_col2:
+                    ls = st.selectbox("🔷 Bentuk Badge", list(LOGO_SHAPES.values()),
+                                      key="logo_shape_sel")
+                    st.session_state.logo_shape = list(LOGO_SHAPES.keys())[list(LOGO_SHAPES.values()).index(ls)]
+                with logo_col3:
+                    st.markdown("**Warna Teks**")
+                    ltc = st.color_picker("Warna Teks Logo", value=st.session_state.logo_text_color_hex,
+                                          key="logo_text_color", label_visibility="collapsed")
+                    st.session_state.logo_text_color_hex = ltc
 
-        d1, d2 = st.columns(2)
+                bdc_col1, bdc_col2 = st.columns(2)
+                with bdc_col1:
+                    st.markdown("**Warna Badge**")
+                    lbc = st.color_picker("Warna Badge", value=st.session_state.logo_badge_color_hex,
+                                          key="logo_badge_color", label_visibility="collapsed")
+                    st.session_state.logo_badge_color_hex = lbc
+                with bdc_col2:
+                    st.markdown("**Warna Border Badge**")
+                    lbrc = st.color_picker("Warna Border", value=st.session_state.logo_border_color_hex,
+                                           key="logo_border_color", label_visibility="collapsed")
+                    st.session_state.logo_border_color_hex = lbrc
 
-        sheet_wm = add_watermark(
-            sheet,
-            st.session_state.watermark_name,
-            logo_img=st.session_state.watermark_logo,
-            position=WATERMARK_POSITIONS.get(st.session_state.watermark_position, "bottom_right"),
-            logo_size_pct=st.session_state.watermark_logo_size,
-            opacity=st.session_state.watermark_opacity,
-        )
+            def _hex_to_rgb(h):
+                h = h.lstrip("#")
+                return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-        with d1:
-            jpg_bytes = sheet_to_bytes(sheet_wm, "JPEG")
-            st.download_button(
-                label="⬇️ Download JPG",
-                data=jpg_bytes,
-                file_name=f"photobooth_{tpl_key}_{current_filter}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
-                mime="image/jpeg",
-                use_container_width=True,
+            with st.spinner("⚙️ Membuat layout..."):
+                if tpl_key == "studio_print":
+                    sheet = build_studio_sheet(
+                        st.session_state.photo, tpl, current_filter,
+                        st.session_state.studio_name,
+                        st.session_state.studio_sub,
+                        logo_font=st.session_state.logo_font,
+                        logo_shape=st.session_state.logo_shape,
+                        logo_text_color=_hex_to_rgb(st.session_state.logo_text_color_hex),
+                        logo_badge_color=_hex_to_rgb(st.session_state.logo_badge_color_hex),
+                        logo_border_color=_hex_to_rgb(st.session_state.logo_border_color_hex),
+                    )
+                elif tpl["style"].startswith("frame_") or tpl["style"].startswith("romance_"):
+                    sheet = build_frame_sheet(st.session_state.photo, tpl, current_filter)
+                else:
+                    sheet = build_sheet(st.session_state.photo, tpl, current_filter)
+                thumb = preview_thumbnail(sheet, max_px=700)
+
+            # Before/After toggle
+            show_before = st.toggle("👁️ Lihat tanpa filter (before/after)", value=False)
+
+            if show_before:
+                if tpl_key == "studio_print":
+                    sheet_before = build_studio_sheet(
+                        st.session_state.photo, tpl, "normal",
+                        st.session_state.studio_name, st.session_state.studio_sub,
+                        logo_font=st.session_state.logo_font,
+                        logo_shape=st.session_state.logo_shape,
+                        logo_text_color=_hex_to_rgb(st.session_state.logo_text_color_hex),
+                        logo_badge_color=_hex_to_rgb(st.session_state.logo_badge_color_hex),
+                        logo_border_color=_hex_to_rgb(st.session_state.logo_border_color_hex),
+                    )
+                elif tpl["style"].startswith("frame_") or tpl["style"].startswith("romance_"):
+                    sheet_before = build_frame_sheet(st.session_state.photo, tpl, "normal")
+                else:
+                    sheet_before = build_sheet(st.session_state.photo, tpl, "normal")
+                thumb_before = preview_thumbnail(sheet_before, max_px=700)
+                bcol1, bcol2 = st.columns(2)
+                with bcol1:
+                    st.markdown('<div class="preview-label">BEFORE (Normal)</div>', unsafe_allow_html=True)
+                    st.image(thumb_before, use_container_width=True)
+                with bcol2:
+                    st.markdown(f'<div class="preview-label">AFTER ({active_f["name"]})</div>', unsafe_allow_html=True)
+                    st.image(thumb, use_container_width=True)
+            else:
+                st.markdown(f'<div class="preview-label">PREVIEW — {active_f["icon"]} {active_f["name"]}</div>', unsafe_allow_html=True)
+                st.image(thumb, use_container_width=True, caption=f"{tpl['name']} · {active_f['name']} — siap cetak di kertas foto A4")
+
+            st.divider()
+            st.markdown("### 5. Download")
+
+            d1, d2 = st.columns(2)
+
+            sheet_wm = add_watermark(
+                sheet,
+                st.session_state.watermark_name,
+                logo_img=st.session_state.watermark_logo,
+                position=WATERMARK_POSITIONS.get(st.session_state.watermark_position, "bottom_right"),
+                logo_size_pct=st.session_state.watermark_logo_size,
+                opacity=st.session_state.watermark_opacity,
             )
 
-        with d2:
-            pdf_bytes = sheet_to_pdf(sheet_wm, tpl)
-            st.download_button(
-                label="⬇️ Download PDF",
-                data=pdf_bytes,
-                file_name=f"photobooth_{tpl_key}_{current_filter}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-            )
+            with d1:
+                jpg_bytes = sheet_to_bytes(sheet_wm, "JPEG")
+                st.download_button(
+                    label="⬇️ Download JPG",
+                    data=jpg_bytes,
+                    file_name=f"photobooth_{tpl_key}_{current_filter}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
+                    mime="image/jpeg",
+                    use_container_width=True,
+                )
 
-        st.divider()
-        if st.button("📦 Download SEMUA Template (ZIP)", use_container_width=True):
-            with st.spinner("Membuat semua template..."):
-                zip_buf = io.BytesIO()
-                with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                    for k, t in TEMPLATES.items():
-                        s = build_sheet(st.session_state.photo, t, current_filter)
-                        jpg = sheet_to_bytes(s, "JPEG")
-                        pdf = sheet_to_pdf(s, t)
-                        zf.writestr(f"{k}_{current_filter}.jpg", jpg)
-                        zf.writestr(f"{k}_{current_filter}.pdf", pdf)
-                zip_buf.seek(0)
-            st.download_button(
-                label="⬇️ Download ZIP",
-                data=zip_buf.getvalue(),
-                file_name=f"photobooth_all_{current_filter}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
-                mime="application/zip",
-                use_container_width=True,
-            )
+            with d2:
+                pdf_bytes = sheet_to_pdf(sheet_wm, tpl)
+                st.download_button(
+                    label="⬇️ Download PDF",
+                    data=pdf_bytes,
+                    file_name=f"photobooth_{tpl_key}_{current_filter}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+
+            st.divider()
+            if st.button("📦 Download SEMUA Template (ZIP)", use_container_width=True):
+                with st.spinner("Membuat semua template..."):
+                    zip_buf = io.BytesIO()
+                    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                        for k, t in TEMPLATES.items():
+                            s = build_sheet(st.session_state.photo, t, current_filter)
+                            jpg = sheet_to_bytes(s, "JPEG")
+                            pdf = sheet_to_pdf(s, t)
+                            zf.writestr(f"{k}_{current_filter}.jpg", jpg)
+                            zf.writestr(f"{k}_{current_filter}.pdf", pdf)
+                    zip_buf.seek(0)
+                st.download_button(
+                    label="⬇️ Download ZIP",
+                    data=zip_buf.getvalue(),
+                    file_name=f"photobooth_all_{current_filter}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                )
 
 
 with tab_collage:
