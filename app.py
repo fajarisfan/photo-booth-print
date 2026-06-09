@@ -1049,10 +1049,10 @@ def build_sheet(photo: Image.Image, tpl: dict, filter_key: str = "normal") -> Im
 
     return sheet
 
-def sheet_to_bytes(sheet: Image.Image, fmt="JPEG") -> bytes:
+def sheet_to_bytes(sheet: Image.Image, fmt="JPEG", quality=95) -> bytes:
     buf = io.BytesIO()
     if fmt == "JPEG":
-        sheet.save(buf, format="JPEG", quality=95, dpi=(DPI, DPI))
+        sheet.save(buf, format="JPEG", quality=quality, dpi=(DPI, DPI))
     else:
         sheet.save(buf, format="PNG", dpi=(DPI, DPI))
     return buf.getvalue()
@@ -1905,6 +1905,69 @@ with tab_photobooth:
                     mime="application/pdf",
                     use_container_width=True,
                 )
+
+            # ── Wallpaper S24 FE ─────────────────────────────────────────────
+            st.divider()
+            st.markdown("#### 📱 Wallpaper Samsung S24 FE")
+
+            WP_W, WP_H = 1080, 2340  # S24 FE resolusi native
+
+            def make_wallpaper(img: Image.Image) -> Image.Image:
+                """Resize + crop foto ke ukuran wallpaper S24 FE 1080x2340."""
+                img = img.convert("RGB")
+                src_w, src_h = img.size
+                target_ratio = WP_W / WP_H
+                src_ratio = src_w / src_h
+
+                if src_ratio > target_ratio:
+                    # Foto lebih lebar — crop kiri kanan
+                    new_h = src_h
+                    new_w = int(src_h * target_ratio)
+                    left = (src_w - new_w) // 2
+                    img = img.crop((left, 0, left + new_w, new_h))
+                else:
+                    # Foto lebih tinggi — crop atas bawah
+                    new_w = src_w
+                    new_h = int(src_w / target_ratio)
+                    top = (src_h - new_h) // 2
+                    img = img.crop((0, top, new_w, top + new_h))
+
+                return img.resize((WP_W, WP_H), Image.LANCZOS)
+
+            wp_col1, wp_col2 = st.columns(2)
+
+            with wp_col1:
+                # Wallpaper dari foto asli
+                wp_raw = make_wallpaper(st.session_state.photo)
+                wp_raw_bytes = sheet_to_bytes(wp_raw, "JPEG", quality=95)
+                st.download_button(
+                    label="📷 Wallpaper Foto Asli",
+                    data=wp_raw_bytes,
+                    file_name=f"wallpaper_s24fe_raw_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
+                    mime="image/jpeg",
+                    use_container_width=True,
+                    help="Foto asli dicrops ke 1080×2340px"
+                )
+
+            with wp_col2:
+                # Wallpaper dari hasil edit (dengan filter + watermark)
+                wp_edited = make_wallpaper(sheet_wm)
+                wp_edited_bytes = sheet_to_bytes(wp_edited, "JPEG", quality=95)
+                st.download_button(
+                    label="🎨 Wallpaper + Filter",
+                    data=wp_edited_bytes,
+                    file_name=f"wallpaper_s24fe_edited_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
+                    mime="image/jpeg",
+                    use_container_width=True,
+                    help="Foto dengan filter aktif dicrops ke 1080×2340px"
+                )
+
+            # Preview wallpaper
+            with st.expander("👁️ Preview Wallpaper", expanded=False):
+                prev_w = int(WP_W * 0.25)
+                prev_h = int(WP_H * 0.25)
+                wp_preview = wp_edited.resize((prev_w, prev_h), Image.LANCZOS)
+                st.image(wp_preview, caption="Preview wallpaper S24 FE (skala 25%)")
 
             st.divider()
             if st.button("📦 Download SEMUA Template (ZIP)", use_container_width=True):
