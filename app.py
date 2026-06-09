@@ -1568,20 +1568,38 @@ with tab_foto:
     input_mode = st.radio("Sumber foto", ["📷 Webcam", "📁 Upload File"], horizontal=True, label_visibility="collapsed")
 
     if input_mode == "📷 Webcam":
-        st.markdown("""
-        <div style="background:#1a1a1a;border-radius:10px;padding:10px 14px;
-                    font-size:13px;color:#aaa;margin-bottom:8px;line-height:1.8;">
-        📸 Tap <b style="color:#f5c518;">Take photo</b> di bawah untuk ambil foto<br>
-        🔄 Foto akan otomatis masuk ke tab Edit
-        </div>""", unsafe_allow_html=True)
+        components.html(get_ar_camera_html(), height=900, scrolling=True)
 
-        cam = st.camera_input("", label_visibility="collapsed")
+        # Bridge textarea — hidden, nerima dataURL dari iframe kamera
+        st.markdown("""<style>
+        div[data-testid="stTextArea"]:has(textarea[aria-label="cam_bridge_ta"]) {
+            position:fixed!important;left:-9999px!important;
+            opacity:0!important;pointer-events:none!important;
+            width:1px!important;height:1px!important;
+        }
+        </style>""", unsafe_allow_html=True)
 
-        if cam is not None:
-            img = Image.open(cam).convert("RGB")
-            st.session_state.photo = img
+        raw_b64 = st.text_area("cam_bridge_ta", key="cam_bridge_ta",
+                               label_visibility="collapsed", height=1)
+
+        if (raw_b64 and isinstance(raw_b64, str)
+                and raw_b64.strip().startswith("data:image")
+                and not st.session_state.get("_photo_just_saved")):
+            try:
+                _, b64data = raw_b64.strip().split(",", 1)
+                img = Image.open(io.BytesIO(base64.b64decode(b64data))).convert("RGB")
+                st.session_state.photo = img
+                st.session_state["_photo_just_saved"] = True
+            except Exception as e:
+                st.error(f"❌ Gagal: {e}")
+            st.rerun()
+
+        if not (raw_b64 and isinstance(raw_b64, str) and raw_b64.strip().startswith("data:image")):
+            st.session_state["_photo_just_saved"] = False
+
+        if st.session_state.photo is not None:
             st.success("✅ Foto berhasil! Buka tab **🎨 2. Edit & Download**")
-            st.image(img, width=160, caption="Foto terakhir")
+            st.image(st.session_state.photo, width=160)
     else:
         uploaded = st.file_uploader(
             "Upload foto (JPG, PNG)",
