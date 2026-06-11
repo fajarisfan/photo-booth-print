@@ -1307,11 +1307,10 @@ body { background:#111; font-family:'Courier New',monospace; color:#eee; }
 </div>
 
 <div id="previewBox">
-  <p id="savedMsg">✅ Foto siap!</p>
+  <p id="savedMsg">✅ Foto tersimpan otomatis!</p>
   <img id="previewImg" src="" alt="preview">
-  <button id="saveBtn" onclick="saveToGallery()" style="width:100%;background:#f5c518;color:#000;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:800;cursor:pointer;margin-top:6px;">💾 Simpan Foto ke Galeri</button>
-  <button id="retakeBtn" onclick="retake()" style="width:100%;background:#1e1e1e;color:#f5c518;border:1.5px solid #f5c518;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px;">🔄 Ambil Ulang Foto</button>
-  <p style="font-size:11px;color:#aaa;margin-top:5px;">Setelah simpan → upload foto di bawah kamera ↓</p>
+  <button id="retakeBtn" onclick="retake()">🔄 Ambil Ulang Foto</button>
+  <p style="font-size:11px;color:#666;margin-top:4px;">Foto kurang pas? Tap ambil ulang</p>
 </div>
 
 <script>
@@ -1487,32 +1486,14 @@ function doSnap() {
 
   capturedUrl = cap.toDataURL('image/jpeg', 0.93);
 
-  // Tampilkan preview
+  // Langsung kirim ke Streamlit — auto simpan
+  window.parent.postMessage({ type:'PHOTO_CAPTURED', dataUrl: capturedUrl }, '*');
+
+  // Tampilkan preview + tombol ambil ulang
   previewImg.src = capturedUrl;
   previewBox.style.display = 'block';
   previewMode = true;
-  statusEl.textContent = '✅ Foto siap! Tap Simpan lalu upload di bawah.';
-}
-
-function saveToGallery() {
-  if (!capturedUrl) return;
-  const byteStr = atob(capturedUrl.split(',')[1]);
-  const ab = new ArrayBuffer(byteStr.length);
-  const ia = new Uint8Array(ab);
-  for (let i=0; i<byteStr.length; i++) ia[i]=byteStr.charCodeAt(i);
-  const blob = new Blob([ab], {type:'image/jpeg'});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'photobooth_' + Date.now() + '.jpg';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  statusEl.textContent = '💾 Tersimpan ke galeri! Upload di bawah kamera ↓';
-  document.getElementById('saveBtn').textContent = '✅ Tersimpan!';
-  document.getElementById('saveBtn').style.background = '#00e676';
-  document.getElementById('saveBtn').style.color = '#000';
+  statusEl.textContent = '✅ Foto tersimpan otomatis!';
 }
 
 function retake() {
@@ -1520,12 +1501,9 @@ function retake() {
   previewBox.style.display = 'none';
   previewMode = false;
   prevFrame   = null;
-  snapCooldown = 30;
+  snapCooldown = 30; // sedikit delay setelah retake
   motionHoldFrames = 0;
   motionScore = 0;
-  document.getElementById('saveBtn').textContent = '💾 Simpan Foto ke Galeri';
-  document.getElementById('saveBtn').style.background = '#f5c518';
-  document.getElementById('saveBtn').style.color = '#000';
   statusEl.textContent = autoSnap
     ? '🤏 Gerakkan tangan untuk snap otomatis'
     : '📸 Tap tombol untuk foto';
@@ -1589,33 +1567,37 @@ st.markdown("### 1. Ambil / Upload Foto")
 input_mode = st.radio("Sumber foto", ["📷 Webcam", "📁 Upload File"], horizontal=True, label_visibility="collapsed")
 
 if input_mode == "📷 Webcam":
-    components.html(get_ar_camera_html(), height=680, scrolling=False)
+    components.html(get_ar_camera_html(), height=900, scrolling=True)
 
-    st.markdown("""
-    <div style="background:#1a2a1a;border-left:4px solid #4caf50;
-                padding:10px 14px;border-radius:4px;margin:6px 0;font-size:13px;color:#ccc;">
-    📋 <b style="color:#4caf50;">Cara pakai kamera:</b><br>
-    1. Gerakkan tangan → snap otomatis, atau tap 📸<br>
-    2. Preview foto muncul → tap <b>💾 Simpan Foto ke Galeri</b><br>
-    3. Upload foto dari galeri di bawah ini ↓
-    </div>
-    """, unsafe_allow_html=True)
+    # Bridge textarea — hidden, nerima dataURL dari iframe kamera
+    st.markdown("""<style>
+    div[data-testid="stTextArea"]:has(textarea[aria-label="cam_bridge_ta"]) {
+        position:fixed!important;left:-9999px!important;
+        opacity:0!important;pointer-events:none!important;
+        width:1px!important;height:1px!important;
+    }
+    </style>""", unsafe_allow_html=True)
 
-    cam_file = st.file_uploader(
-        "📥 Upload foto hasil kamera di sini",
-        type=["jpg","jpeg","png"],
-        key="cam_file_bridge",
-        label_visibility="visible",
-    )
-    if cam_file is not None:
-        img = Image.open(cam_file).convert("RGB")
-        st.session_state.photo = img
-        st.session_state["_photo_just_saved"] = True
-        st.success("✅ Foto berhasil disimpan!")
+    raw_b64 = st.text_area("cam_bridge_ta", key="cam_bridge_ta",
+                           label_visibility="collapsed", height=1)
+
+    if (raw_b64 and isinstance(raw_b64, str)
+            and raw_b64.strip().startswith("data:image")
+            and not st.session_state.get("_photo_just_saved")):
+        try:
+            _, b64data = raw_b64.strip().split(",", 1)
+            img = Image.open(io.BytesIO(base64.b64decode(b64data))).convert("RGB")
+            st.session_state.photo = img
+            st.session_state["_photo_just_saved"] = True
+        except Exception as e:
+            st.error(f"❌ Gagal: {e}")
         st.rerun()
 
+    if not (raw_b64 and isinstance(raw_b64, str) and raw_b64.strip().startswith("data:image")):
+        st.session_state["_photo_just_saved"] = False
+
     if st.session_state.photo is not None:
-        st.success("✅ Foto siap! Buka tab **🎨 2. Edit & Download**")
+        st.success("✅ Foto berhasil! Buka tab **🎨 2. Edit & Download**")
         st.image(st.session_state.photo, width=160)
 else:
     uploaded = st.file_uploader(
@@ -1728,29 +1710,31 @@ st.markdown("## 🎨 Edit & Download")
 
 st.markdown("### Edit & Download")
 
-# ── Template Picker di tab edit ───────────────────────────────────────────
-if st.session_state.photo is not None:
-    st.markdown("#### 🖼️ Pilih Template")
-    tpl_keys = list(TEMPLATES.keys())
-    for i in range(0, len(tpl_keys), 2):
-        c1, c2 = st.columns(2)
-        for j, col in enumerate([c1, c2]):
-            if i + j < len(tpl_keys):
-                key = tpl_keys[i + j]
-                t = TEMPLATES[key]
-                selected = st.session_state.selected_tpl == key
-                with col:
-                    if st.button(
-                        f"{t['icon']} {t['name']}",
-                        key=f"tpl_{key}",
-                        use_container_width=True,
-                        type="primary" if selected else "secondary",
-                        help=t['desc'],
-                    ):
-                        st.session_state.selected_tpl = key
-                        st.rerun()
-                    st.caption(t['desc'])
-    st.divider()
+# ── Template Picker — selalu tampil ──────────────────────────────────────
+st.markdown("#### 🖼️ Pilih Template")
+st.caption("Pilih template sebelum atau sesudah foto — preview otomatis update")
+tpl_keys = list(TEMPLATES.keys())
+st.caption(f"Total: {len(tpl_keys)} template tersedia — tap untuk pilih")
+for i in range(0, len(tpl_keys), 3):
+    cols = st.columns(3)
+    for j, col in enumerate(cols):
+        if i + j < len(tpl_keys):
+            key = tpl_keys[i + j]
+            t = TEMPLATES[key]
+            selected = st.session_state.selected_tpl == key
+            with col:
+                label = f"{'✅ ' if selected else ''}{t['icon']} {t['name']}"
+                if st.button(
+                    label,
+                    key=f"tpl_{key}",
+                    use_container_width=True,
+                    type="primary" if selected else "secondary",
+                    help=t['desc'],
+                ):
+                    st.session_state.selected_tpl = key
+                    st.rerun()
+                st.caption(t['desc'])
+st.divider()
 
 # Debug info (hapus setelah stabil)
 if st.session_state.get("debug_mode"):
@@ -1795,7 +1779,7 @@ if st.session_state.photo is None:
         <div style="margin-top:8px; background:#f5c518; color:#000;
                     padding:6px 18px; border-radius:20px; font-size:12px;
                     font-weight:700; letter-spacing:1px;">
-            ← PANEL KIRI
+            ↑ SCROLL KE ATAS — AMBIL FOTO DULU
         </div>
     </div>
     """, unsafe_allow_html=True)
