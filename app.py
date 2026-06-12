@@ -1486,8 +1486,42 @@ function doSnap() {
 
   capturedUrl = cap.toDataURL('image/jpeg', 0.93);
 
-  // Langsung kirim ke Streamlit — auto simpan
-  window.parent.postMessage({ type:'PHOTO_CAPTURED', dataUrl: capturedUrl }, '*');
+  // Simpan ke sessionStorage dulu
+  try { sessionStorage.setItem('ph_cap', capturedUrl); } catch(e){}
+
+  // Inject ke textarea Streamlit — multi-method untuk reliability
+  function injectToStreamlit(dataUrl) {
+    // Method 1: cari textarea di parent
+    try {
+      const frames = [window, window.parent, window.top];
+      for (const f of frames) {
+        try {
+          const tas = f.document.querySelectorAll('textarea');
+          for (const ta of tas) {
+            const lbl = ta.getAttribute('aria-label') || '';
+            if (lbl === 'cam_bridge_ta' || ta.id === 'cam_bridge_ta') {
+              const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+              setter.call(ta, dataUrl);
+              ta.dispatchEvent(new Event('input', {bubbles:true}));
+              ta.dispatchEvent(new Event('change', {bubbles:true}));
+              ta.focus(); ta.blur();
+              return true;
+            }
+          }
+        } catch(e2){}
+      }
+    } catch(e){}
+    return false;
+  }
+
+  // Coba inject langsung, kalau gagal retry 3x
+  let tries = 0;
+  function tryInject() {
+    if (injectToStreamlit(dataUrl)) return;
+    tries++;
+    if (tries < 5) setTimeout(tryInject, 400);
+  }
+  tryInject();
 
   // Tampilkan preview + tombol ambil ulang
   previewImg.src = capturedUrl;
@@ -1567,14 +1601,15 @@ st.markdown("### 1. Ambil / Upload Foto")
 input_mode = st.radio("Sumber foto", ["📷 Webcam", "📁 Upload File"], horizontal=True, label_visibility="collapsed")
 
 if input_mode == "📷 Webcam":
+    # Kamera custom dengan timer + auto-snap
     components.html(get_ar_camera_html(), height=900, scrolling=True)
 
-    # Bridge textarea — hidden, nerima dataURL dari iframe kamera
+    # Bridge hidden textarea
     st.markdown("""<style>
     div[data-testid="stTextArea"]:has(textarea[aria-label="cam_bridge_ta"]) {
-        position:fixed!important;left:-9999px!important;
+        position:fixed!important;left:-9999px!important;top:-9999px!important;
         opacity:0!important;pointer-events:none!important;
-        width:1px!important;height:1px!important;
+        width:1px!important;height:1px!important;overflow:hidden!important;
     }
     </style>""", unsafe_allow_html=True)
 
@@ -1590,15 +1625,26 @@ if input_mode == "📷 Webcam":
             st.session_state.photo = img
             st.session_state["_photo_just_saved"] = True
         except Exception as e:
-            st.error(f"❌ Gagal: {e}")
+            st.error(f"❌ Gagal proses foto: {e}")
         st.rerun()
 
     if not (raw_b64 and isinstance(raw_b64, str) and raw_b64.strip().startswith("data:image")):
         st.session_state["_photo_just_saved"] = False
 
+    # Fallback: kalau kamera custom tidak jalan, pakai native
+    st.markdown("---")
+    st.caption("📱 Kalau kamera di atas tidak jalan, pakai tombol di bawah:")
+    cam_fallback = st.camera_input("", label_visibility="collapsed", key="cam_fallback")
+    if cam_fallback is not None:
+        img_fb = Image.open(cam_fallback).convert("RGB")
+        if st.session_state.get("_last_fb_id") != id(cam_fallback):
+            st.session_state.photo = img_fb
+            st.session_state["_last_fb_id"] = id(cam_fallback)
+            st.rerun()
+
     if st.session_state.photo is not None:
-        st.success("✅ Foto berhasil! Buka tab **🎨 2. Edit & Download**")
-        st.image(st.session_state.photo, width=160)
+        st.success("✅ Foto tersimpan — scroll ke bawah untuk edit!")
+        st.image(st.session_state.photo, width=160, caption="Foto terakhir")
 else:
     uploaded = st.file_uploader(
         "Upload foto (JPG, PNG)",
