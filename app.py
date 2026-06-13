@@ -875,84 +875,121 @@ def build_frame_sheet(photo: Image.Image, tpl: dict, filter_key: str) -> Image.I
         return sheet
 
     elif style == "grunge_strip4":
+        import random as _rnd
+        from PIL import ImageEnhance as _IE2
         DPI_ = 300; CM_ = DPI_ / 2.54
         def cm2(v): return int(v * CM_)
-        pw, ph = cm2(tpl["w"]), cm2(tpl["h"])
-        sheet = Image.new("RGB", (pw, ph), (15, 13, 11))
+
+        # Canvas — portrait strip seperti KPR
+        pw, ph = cm2(6.0), cm2(18.0)
+        sheet = Image.new("RGB", (pw, ph), (18, 16, 14))
         draw = ImageDraw.Draw(sheet)
 
-        # Noise grain
-        import random as _rnd
-        _r = _rnd.Random(42)
-        for _ in range(pw * ph // 8):
-            rx2, ry2 = _r.randint(0, pw-1), _r.randint(0, ph-1)
-            v2 = _r.randint(20, 45)
-            sheet.putpixel((rx2, ry2), (v2, v2, v2))
+        # ── Grain/noise texture ──────────────────────────────────────────────
+        _r = _rnd.Random(99)
+        for _ in range(pw * ph // 6):
+            _rx, _ry = _r.randint(0, pw-1), _r.randint(0, ph-1)
+            _v = _r.randint(15, 50)
+            try: sheet.putpixel((_rx, _ry), (_v, _v, _v))
+            except: pass
 
-        header_h = cm2(2.8); footer_h = cm2(2.8); gap = cm2(0.2)
-        photo_area_h = ph - header_h - footer_h - gap * 5
-        cell_h = photo_area_h // 4
-        cell_w = pw - cm2(0.6); cell_x = cm2(0.3)
+        # ── Rounded border putih kekuningan (aged paper) ─────────────────────
+        border_col = (210, 200, 170)
+        draw.rounded_rectangle([cm2(0.12), cm2(0.12), pw-cm2(0.12), ph-cm2(0.12)],
+                                radius=cm2(0.4), outline=border_col, width=cm2(0.06))
 
-        # 4 foto — ambil dari multi_frames kalau ada
+        # ── Layout ───────────────────────────────────────────────────────────
+        header_h = cm2(2.6)
+        footer_h = cm2(2.6)
+        pad_x    = cm2(0.28)
+        gap      = cm2(0.15)
+        n_rows   = 4
+        photo_area_h = ph - header_h - footer_h - gap*(n_rows+1)
+        cell_h = photo_area_h // n_rows
+        cell_w = pw - pad_x * 2
+
+        # ── 4 foto B&W ───────────────────────────────────────────────────────
         photos_src = st.session_state.get("multi_frames", [])
         if not photos_src:
-            photos_src = [photo] * 4
-        while len(photos_src) < 4:
+            photos_src = [photo] * n_rows
+        while len(photos_src) < n_rows:
             photos_src = photos_src + [photos_src[-1]]
-        photos_src = photos_src[:4]
+        photos_src = photos_src[:n_rows]
 
-        from PIL import ImageEnhance as _IE2
         for idx2, ph_src in enumerate(photos_src):
             cy = header_h + gap + idx2 * (cell_h + gap)
-            cell_bw = _IE2.Contrast(ph_src.convert("RGB")).enhance(1.4)
-            cell_bw = _IE2.Brightness(cell_bw).enhance(0.92)
-            cell_bw = cell_bw.convert("L").convert("RGB")
-            cell_img = fit_crop(cell_bw, cell_w, cell_h)
-            draw.rectangle([cell_x-3, cy-3, cell_x+cell_w+3, cy+cell_h+3], outline=(80,75,65), width=2)
-            sheet.paste(cell_img, (cell_x, cy))
+            # B&W + contrast
+            _bw = _IE2.Contrast(ph_src.convert("RGB")).enhance(1.5)
+            _bw = _IE2.Brightness(_bw).enhance(0.88)
+            _bw = _bw.convert("L").convert("RGB")
+            cell_img = fit_crop(_bw, cell_w, cell_h)
+            # Aged border per cell
+            draw.rectangle([pad_x-2, cy-2, pad_x+cell_w+2, cy+cell_h+2],
+                           outline=(90, 82, 68), width=2)
+            sheet.paste(cell_img, (pad_x, cy))
 
-        # Font
+        # ── Fonts ────────────────────────────────────────────────────────────
         try:
-            font_big = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf", cm2(0.55))
-            font_sm  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cm2(0.28))
+            f_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cm2(0.62))
+            f_sub   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cm2(0.32))
+            f_sm    = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", cm2(0.25))
         except:
-            font_big = font_sm = ImageFont.load_default()
+            f_title = f_sub = f_sm = ImageFont.load_default()
 
-        # Label teks
-        if tpl.get("custom_label", False):
-            label_text = st.session_state.get("grunge_label", "PHOTO\nBOOTH")
+        # ── Helper draw text center ──────────────────────────────────────────
+        def draw_txt_center(txt, font, y, fill=(238,228,195), shadow=True):
+            bb = draw.textbbox((0,0), txt, font=font)
+            tx = (pw - (bb[2]-bb[0])) // 2
+            if shadow:
+                draw.text((tx+2, y+2), txt, fill=(0,0,0), font=font)
+            draw.text((tx, y), txt, fill=fill, font=font)
+            return bb[3] - bb[1]
+
+        def draw_txt_right(txt, font, y, fill=(200,190,160)):
+            bb = draw.textbbox((0,0), txt, font=font)
+            tx = pw - (bb[2]-bb[0]) - cm2(0.3)
+            draw.text((tx+1, y+1), txt, fill=(0,0,0), font=font)
+            draw.text((tx, y), txt, fill=fill, font=font)
+
+        # ── Label text ───────────────────────────────────────────────────────
+        is_custom = tpl.get("custom_label", False)
+        if is_custom:
+            label_lines = st.session_state.get("grunge_label", "PHOTO\nBOOTH").split("\n")
         else:
-            label_text = tpl.get("fixed_label", "KELOMPOK\nPENERBANG\nROKET")
+            label_lines = ["KELOMPOK", "PENERBANG", "ROKET"]
 
         for_name = st.session_state.get("grunge_for_name", "")
 
-        # Draw header label
-        for li2, line2 in enumerate(label_text.split("\n")):
-            bb = draw.textbbox((0,0), line2, font=font_big)
-            tx = (pw - (bb[2]-bb[0])) // 2
-            ty = cm2(0.15) + li2 * cm2(0.65)
-            draw.text((tx+2, ty+2), line2, fill=(0,0,0), font=font_big)
-            draw.text((tx, ty), line2, fill=(240,230,200), font=font_big)
+        # ── HEADER ───────────────────────────────────────────────────────────
+        # Rocket arrows (decorative) kiri kanan baris pertama
+        hdr_y = cm2(0.18)
+        if not is_custom:
+            # ✈ roket di kiri & kanan
+            draw.text((cm2(0.2), hdr_y + cm2(0.05)), "✈", fill=(210,200,165), font=f_sub)
+            draw.text((pw - cm2(0.65), hdr_y + cm2(0.05)), "✈", fill=(210,200,165), font=f_sub)
 
-        # FOR: name
+        for li, ln in enumerate(label_lines):
+            h = draw_txt_center(ln, f_title, hdr_y + li * cm2(0.75))
+
+        # FOR: [NAME] di header kanan
         if for_name:
-            for_txt = f"FOR: {for_name.upper()}"
-            bb2 = draw.textbbox((0,0), for_txt, font=font_sm)
-            tx2 = pw - (bb2[2]-bb2[0]) - cm2(0.3)
-            draw.text((tx2+1, cm2(0.3)+1), for_txt, fill=(0,0,0), font=font_sm)
-            draw.text((tx2, cm2(0.3)), for_txt, fill=(200,190,160), font=font_sm)
+            draw_txt_right(f"FOR: {for_name.upper()}", f_sub, cm2(0.2))
+        elif not for_name and not is_custom:
+            draw_txt_right("FOR: [Nama Kamu]", f_sm, cm2(0.22), fill=(150,140,120))
 
-        # Footer label
-        footer_y = ph - footer_h + cm2(0.2)
-        for li3, line3 in enumerate(label_text.split("\n")):
-            bb3 = draw.textbbox((0,0), line3, font=font_big)
-            tx3 = (pw - (bb3[2]-bb3[0])) // 2
-            draw.text((tx3+2, footer_y+li3*cm2(0.65)+2), line3, fill=(0,0,0), font=font_big)
-            draw.text((tx3, footer_y+li3*cm2(0.65)), line3, fill=(240,230,200), font=font_big)
+        # ── FOOTER ───────────────────────────────────────────────────────────
+        footer_y = ph - footer_h + cm2(0.18)
 
-        # Diamond
-        draw.text((pw-cm2(0.7), ph-cm2(0.6)), "◆", fill=(180,170,140), font=font_sm)
+        if not is_custom:
+            draw.text((cm2(0.2), footer_y + cm2(0.05)), "✈", fill=(210,200,165), font=f_sub)
+            draw.text((pw - cm2(0.65), footer_y + cm2(0.05)), "✈", fill=(210,200,165), font=f_sub)
+
+        for li, ln in enumerate(label_lines):
+            draw_txt_center(ln, f_title, footer_y + li * cm2(0.75))
+
+        # Diamond ◆ pojok kanan bawah
+        draw.text((pw - cm2(0.65), ph - cm2(0.55)), "◆", fill=(180,170,140), font=f_sub)
+
         return sheet
 
     # fallback
