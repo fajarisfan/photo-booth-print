@@ -253,6 +253,29 @@ TEMPLATES = {
         "border": 0,
         "style": "romance_lovenotes",
     },
+    "grunge_strip4": {
+        "name": "🎸 Grunge Strip (Custom)",
+        "w": 6.0, "h": 18.0,
+        "cols": 1, "rows": 4,
+        "desc": "4 foto vertical\nB&W grunge\nNama bisa diganti",
+        "icon": "🎸",
+        "bg_color": (20, 18, 16),
+        "border": 0,
+        "style": "grunge_strip4",
+        "custom_label": True,
+    },
+    "grunge_strip4_kpr": {
+        "name": "🚀 KPR Strip",
+        "w": 6.0, "h": 18.0,
+        "cols": 1, "rows": 4,
+        "desc": "4 foto vertical\nB&W grunge\nFixed KPR style",
+        "icon": "🚀",
+        "bg_color": (20, 18, 16),
+        "border": 0,
+        "style": "grunge_strip4",
+        "custom_label": False,
+        "fixed_label": "KELOMPOK\nPENERBANG\nROKET",
+    },
 }
 
 # ── Photo Filter / Tema definitions ───────────────────────────────────────────
@@ -849,6 +872,87 @@ def build_frame_sheet(photo: Image.Image, tpl: dict, filter_key: str) -> Image.I
         # Arrow bottom
         draw.line([(cm2(0.5), ph - cm2(0.55)), (pw - cm2(0.5), ph - cm2(0.55))], fill=(200, 140, 100), width=2)
         draw.text((cm2(0.5), ph - cm2(0.5)), "→", fill=(180, 120, 80), font=font_sub)
+        return sheet
+
+    elif style == "grunge_strip4":
+        DPI_ = 300; CM_ = DPI_ / 2.54
+        def cm2(v): return int(v * CM_)
+        pw, ph = cm2(tpl["w"]), cm2(tpl["h"])
+        sheet = Image.new("RGB", (pw, ph), (15, 13, 11))
+        draw = ImageDraw.Draw(sheet)
+
+        # Noise grain
+        import random as _rnd
+        _r = _rnd.Random(42)
+        for _ in range(pw * ph // 8):
+            rx2, ry2 = _r.randint(0, pw-1), _r.randint(0, ph-1)
+            v2 = _r.randint(20, 45)
+            sheet.putpixel((rx2, ry2), (v2, v2, v2))
+
+        header_h = cm2(2.8); footer_h = cm2(2.8); gap = cm2(0.2)
+        photo_area_h = ph - header_h - footer_h - gap * 5
+        cell_h = photo_area_h // 4
+        cell_w = pw - cm2(0.6); cell_x = cm2(0.3)
+
+        # 4 foto — ambil dari multi_frames kalau ada
+        photos_src = st.session_state.get("multi_frames", [])
+        if not photos_src:
+            photos_src = [photo] * 4
+        while len(photos_src) < 4:
+            photos_src = photos_src + [photos_src[-1]]
+        photos_src = photos_src[:4]
+
+        from PIL import ImageEnhance as _IE2
+        for idx2, ph_src in enumerate(photos_src):
+            cy = header_h + gap + idx2 * (cell_h + gap)
+            cell_bw = _IE2.Contrast(ph_src.convert("RGB")).enhance(1.4)
+            cell_bw = _IE2.Brightness(cell_bw).enhance(0.92)
+            cell_bw = cell_bw.convert("L").convert("RGB")
+            cell_img = fit_crop(cell_bw, cell_w, cell_h)
+            draw.rectangle([cell_x-3, cy-3, cell_x+cell_w+3, cy+cell_h+3], outline=(80,75,65), width=2)
+            sheet.paste(cell_img, (cell_x, cy))
+
+        # Font
+        try:
+            font_big = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf", cm2(0.55))
+            font_sm  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", cm2(0.28))
+        except:
+            font_big = font_sm = ImageFont.load_default()
+
+        # Label teks
+        if tpl.get("custom_label", False):
+            label_text = st.session_state.get("grunge_label", "PHOTO\nBOOTH")
+        else:
+            label_text = tpl.get("fixed_label", "KELOMPOK\nPENERBANG\nROKET")
+
+        for_name = st.session_state.get("grunge_for_name", "")
+
+        # Draw header label
+        for li2, line2 in enumerate(label_text.split("\n")):
+            bb = draw.textbbox((0,0), line2, font=font_big)
+            tx = (pw - (bb[2]-bb[0])) // 2
+            ty = cm2(0.15) + li2 * cm2(0.65)
+            draw.text((tx+2, ty+2), line2, fill=(0,0,0), font=font_big)
+            draw.text((tx, ty), line2, fill=(240,230,200), font=font_big)
+
+        # FOR: name
+        if for_name:
+            for_txt = f"FOR: {for_name.upper()}"
+            bb2 = draw.textbbox((0,0), for_txt, font=font_sm)
+            tx2 = pw - (bb2[2]-bb2[0]) - cm2(0.3)
+            draw.text((tx2+1, cm2(0.3)+1), for_txt, fill=(0,0,0), font=font_sm)
+            draw.text((tx2, cm2(0.3)), for_txt, fill=(200,190,160), font=font_sm)
+
+        # Footer label
+        footer_y = ph - footer_h + cm2(0.2)
+        for li3, line3 in enumerate(label_text.split("\n")):
+            bb3 = draw.textbbox((0,0), line3, font=font_big)
+            tx3 = (pw - (bb3[2]-bb3[0])) // 2
+            draw.text((tx3+2, footer_y+li3*cm2(0.65)+2), line3, fill=(0,0,0), font=font_big)
+            draw.text((tx3, footer_y+li3*cm2(0.65)), line3, fill=(240,230,200), font=font_big)
+
+        # Diamond
+        draw.text((pw-cm2(0.7), ph-cm2(0.6)), "◆", fill=(180,170,140), font=font_sm)
         return sheet
 
     # fallback
@@ -1559,6 +1663,14 @@ if "collage_layout" not in st.session_state:
     st.session_state.collage_layout = "grid"
 if "collage_filter" not in st.session_state:
     st.session_state.collage_filter = "normal"
+if "multi_frames" not in st.session_state:
+    st.session_state.multi_frames = []
+if "multi_frame_count" not in st.session_state:
+    st.session_state.multi_frame_count = 4
+if "grunge_label" not in st.session_state:
+    st.session_state.grunge_label = "PHOTO\nBOOTH"
+if "grunge_for_name" not in st.session_state:
+    st.session_state.grunge_for_name = ""
 if "studio_name" not in st.session_state:
     st.session_state.studio_name = "oh! shoot"
 if "studio_sub" not in st.session_state:
@@ -1624,6 +1736,7 @@ if input_mode == "📷 Webcam":
             img = Image.open(io.BytesIO(base64.b64decode(b64data))).convert("RGB")
             st.session_state.photo = img
             st.session_state["_photo_just_saved"] = True
+            st.session_state["_photo_added_to_mf"] = False
         except Exception as e:
             st.error(f"❌ Gagal proses foto: {e}")
         st.rerun()
@@ -1640,11 +1753,49 @@ if input_mode == "📷 Webcam":
         if st.session_state.get("_last_fb_id") != id(cam_fallback):
             st.session_state.photo = img_fb
             st.session_state["_last_fb_id"] = id(cam_fallback)
+            st.session_state["_photo_added_to_mf"] = False
             st.rerun()
 
+    # ── Multi-frame mode ─────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### 🎞️ Mode Multi-Frame")
+    st.caption("Ambil beberapa foto berbeda untuk template strip (2/3/4 frame)")
+
+    mf_cols = st.columns(3)
+    for mfi, mfc in enumerate([2, 3, 4]):
+        with mf_cols[mfi]:
+            active = st.session_state.multi_frame_count == mfc
+            if st.button(f"{'✅ ' if active else ''}{mfc} Frame",
+                        key=f"mf_{mfc}", use_container_width=True,
+                        type="primary" if active else "secondary"):
+                st.session_state.multi_frame_count = mfc
+                st.session_state.multi_frames = []
+                st.rerun()
+
+    if st.session_state.multi_frames:
+        st.caption(f"📸 Foto terkumpul: {len(st.session_state.multi_frames)}/{st.session_state.multi_frame_count}")
+        prev_cols = st.columns(len(st.session_state.multi_frames))
+        for pi, pimg in enumerate(st.session_state.multi_frames):
+            with prev_cols[pi]:
+                st.image(pimg, width=80, caption=f"#{pi+1}")
+        if st.button("🗑️ Reset semua frame", key="reset_mf"):
+            st.session_state.multi_frames = []
+            st.rerun()
+    else:
+        st.info(f"Belum ada foto — ambil {st.session_state.multi_frame_count} foto untuk mode multi-frame")
+
     if st.session_state.photo is not None:
-        st.success("✅ Foto tersimpan — scroll ke bawah untuk edit!")
+        # Auto-collect ke multi_frames
+        if (len(st.session_state.multi_frames) < st.session_state.multi_frame_count
+                and not st.session_state.get("_photo_added_to_mf")):
+            st.session_state.multi_frames.append(st.session_state.photo.copy())
+            st.session_state["_photo_added_to_mf"] = True
+
+        st.success(f"✅ Foto #{len(st.session_state.multi_frames)} tersimpan — scroll ke bawah untuk edit!")
         st.image(st.session_state.photo, width=160, caption="Foto terakhir")
+
+        if len(st.session_state.multi_frames) >= st.session_state.multi_frame_count:
+            st.success(f"🎉 {st.session_state.multi_frame_count} foto terkumpul! Pilih template strip di bawah.")
 else:
     uploaded = st.file_uploader(
         "Upload foto (JPG, PNG)",
@@ -1782,9 +1933,26 @@ for i in range(0, len(tpl_keys), 3):
                 st.caption(t['desc'])
 st.divider()
 
-# Debug info (hapus setelah stabil)
-if st.session_state.get("debug_mode"):
-    st.caption(f"photo={st.session_state.photo is not None} | tpl={st.session_state.selected_tpl} | filter={st.session_state.selected_filter}")
+# Grunge custom label (muncul kalau template grunge dipilih)
+if st.session_state.get("selected_tpl", "") in ("grunge_strip4", "grunge_strip4_kpr"):
+    st.markdown("#### 🎸 Kustomisasi Grunge Strip")
+    gc1, gc2 = st.columns(2)
+    with gc1:
+        is_custom = TEMPLATES.get(st.session_state.selected_tpl, {}).get("custom_label", False)
+        gl = st.text_input(
+            "Nama / Judul (pisah baris pakai \\n)",
+            value=st.session_state.grunge_label,
+            key="grunge_label_input", max_chars=40,
+            disabled=not is_custom,
+            placeholder="PHOTO\nBOOTH")
+        st.session_state.grunge_label = gl
+    with gc2:
+        gf = st.text_input(
+            "FOR: [nama penerima]",
+            value=st.session_state.grunge_for_name,
+            key="grunge_for_input", max_chars=20,
+            placeholder="ZIZAH")
+        st.session_state.grunge_for_name = gf
 
 # Fallback kalau selected_tpl tidak valid
 tpl_key = st.session_state.get("selected_tpl", list(TEMPLATES.keys())[0])
